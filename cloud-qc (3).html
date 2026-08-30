@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud QC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<style>
+  :root{
+    --bg:#0D0821;
+    --surface:#170F32;
+    --surface-2:#1E1442;
+    --primary:#8B5CF6;
+    --primary-dim:#7C3AED;
+    --secondary:#38BDF8;
+    --accent:#F0ABFC;
+    --gold:#FBBF24;
+    --text:#EDE9FE;
+    --text-muted:#948CBB;
+    --border:#2C2258;
+    --border-soft:#241B4A;
+    --success:#34D399;
+    --success-bg:rgba(52,211,153,0.14);
+    --warn:#FBBF24;
+    --warn-bg:rgba(251,191,36,0.14);
+    --urgent:#FB7185;
+    --urgent-bg:rgba(251,113,133,0.16);
+    --radius:10px;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 700px 400px at 12% 8%, rgba(139,92,246,0.16), transparent 60%),
+      radial-gradient(ellipse 600px 500px at 88% 20%, rgba(56,189,248,0.10), transparent 55%),
+      radial-gradient(ellipse 800px 600px at 50% 100%, rgba(240,171,252,0.06), transparent 60%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:14px;
+    line-height:1.5;
+    min-height:100vh;
+    position:relative;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;
+    pointer-events:none;
+    background-image:
+      radial-gradient(1.5px 1.5px at 20px 30px, rgba(237,233,254,0.5), transparent),
+      radial-gradient(1px 1px at 140px 90px, rgba(237,233,254,0.4), transparent),
+      radial-gradient(1.5px 1.5px at 260px 200px, rgba(237,233,254,0.35), transparent),
+      radial-gradient(1px 1px at 340px 60px, rgba(237,233,254,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 400px 300px, rgba(237,233,254,0.4), transparent),
+      radial-gradient(1px 1px at 500px 150px, rgba(237,233,254,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 600px 400px, rgba(237,233,254,0.35), transparent),
+      radial-gradient(1px 1px at 700px 80px, rgba(237,233,254,0.3), transparent),
+      radial-gradient(1.5px 1.5px at 90px 450px, rgba(237,233,254,0.4), transparent),
+      radial-gradient(1px 1px at 800px 500px, rgba(237,233,254,0.3), transparent);
+    background-repeat:repeat;
+    background-size:850px 550px;
+    opacity:0.6;
+    z-index:0;
+  }
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  .hidden{display:none !important;}
+
+  /* ================= AUTH SCREEN ================= */
+  #auth-screen{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .auth-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+  .auth-brand{font-family:var(--font-display);font-weight:700;font-size:20px;display:flex;align-items:center;gap:8px;margin-bottom:4px;
+    background:linear-gradient(90deg,#C4B5FD,#67E8F9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .auth-sub{color:var(--text-muted);font-size:12.5px;margin-bottom:20px;}
+  .auth-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--surface-2);border-radius:8px;padding:4px;}
+  .auth-tab{flex:1;text-align:center;padding:8px;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--text-muted);}
+  .auth-tab.active{background:var(--primary-dim);color:#fff;}
+  .auth-msg{font-size:12px;padding:9px 11px;border-radius:7px;margin-bottom:14px;}
+  .auth-msg.error{background:var(--urgent-bg);color:var(--urgent);}
+  .auth-msg.info{background:var(--success-bg);color:var(--success);}
+  .auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;}
+  .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--border);}
+  .btn-google{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:10px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .auth-fine{font-size:10.5px;color:var(--text-muted);margin-top:14px;line-height:1.5;}
+  .auth-demo{font-size:11px;color:var(--text-muted);margin-top:10px;font-family:var(--font-mono);}
+
+  /* ================= APP SHELL ================= */
+  .app{display:flex;min-height:100vh;position:relative;z-index:1;}
+  .sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,#150C31 0%,#0F0A26 100%);border-right:1px solid var(--border-soft);color:#DCD5F5;display:flex;flex-direction:column;padding:24px 0;}
+  .brand{padding:0 20px 20px 20px;border-bottom:1px solid var(--border-soft);margin-bottom:16px;}
+  .brand-mark{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:-0.01em;display:flex;align-items:center;gap:8px;
+    background:linear-gradient(90deg,#C4B5FD,#67E8F9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .brand-mark svg{flex-shrink:0;}
+  .brand-sub{font-size:11px;color:var(--text-muted);margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;font-size:13.5px;font-weight:500;color:var(--text-muted);border-left:3px solid transparent;transition:all .15s ease;}
+  .nav-item:hover{color:#fff;background:rgba(139,92,246,0.08);}
+  .nav-item.active{color:#fff;background:rgba(139,92,246,0.14);border-left-color:var(--accent);}
+  .nav-icon{width:16px;height:16px;flex-shrink:0;opacity:0.9;}
+  .nav-admin-tag{font-size:9px;background:var(--gold);color:#2A1145;padding:1px 5px;border-radius:100px;font-weight:700;margin-left:auto;}
+  .sidebar-footer{margin-top:auto;padding:14px 20px 0 20px;border-top:1px solid var(--border-soft);font-size:11px;color:var(--text-muted);line-height:1.5;}
+  .sidebar-user{display:flex;align-items:center;gap:8px;padding:0 20px 14px 20px;}
+  .btn-logout{background:none;border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:5px 10px;border-radius:6px;margin:0 20px 14px 20px;}
+  .btn-logout:hover{color:#fff;border-color:var(--secondary);}
+
+  .main{flex:1;padding:32px 40px 60px 40px;max-width:1180px;}
+  .page-head{margin-bottom:24px;}
+  .page-title{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-0.01em;color:#F5F3FF;}
+  .page-desc{color:var(--text-muted);font-size:13.5px;margin-top:4px;}
+  .shared-banner{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--secondary);border-radius:8px;padding:9px 14px;font-size:12.5px;color:var(--text-muted);margin-bottom:20px;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+  .stat-label{font-size:11.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;}
+  .stat-value{font-family:var(--font-mono);font-size:26px;font-weight:500;margin-top:6px;
+    background:linear-gradient(90deg,#C4B5FD,#93E7FA);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+
+  .section-label{font-family:var(--font-display);font-weight:600;font-size:14px;margin:0 0 12px 0;display:flex;align-items:center;justify-content:space-between;color:#F0EDFF;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;}
+  .two-col{display:grid;grid-template-columns:1.1fr 1.4fr;gap:20px;align-items:start;}
+  .orbit-wrap{display:flex;align-items:center;justify-content:center;padding:8px 0 4px 0;}
+
+  .nn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+  .nn-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;transition:border-color .15s ease, box-shadow .15s ease;}
+  .nn-card:hover{border-color:var(--secondary);box-shadow:0 0 0 1px rgba(56,189,248,0.25);}
+  .nn-card-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .nn-name{font-weight:600;font-size:14px;color:#F5F3FF;}
+  .nn-city{color:var(--text-muted);font-size:12px;margin-top:2px;}
+  .nn-meta{margin-top:10px;font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:3px;}
+
+  .badge{display:inline-block;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:0.02em;}
+  .badge-success{background:var(--success-bg);color:var(--success);}
+  .badge-warn{background:var(--warn-bg);color:var(--warn);}
+  .badge-urgent{background:var(--urgent-bg);color:var(--urgent);}
+  .badge-neutral{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);}
+
+  .visit-row{display:grid;grid-template-columns:90px 1fr 70px 90px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .visit-row:last-child{border-bottom:none;}
+  .visit-date{font-family:var(--font-mono);color:var(--text-muted);font-size:12px;}
+  .visit-nn{font-weight:500;color:#F0EDFF;}
+  .visit-sub{color:var(--text-muted);font-size:12px;margin-top:1px;}
+  .visit-att{font-family:var(--font-mono);text-align:right;}
+
+  .empty-state{text-align:center;padding:36px 20px;color:var(--text-muted);font-size:13px;}
+  .empty-state strong{display:block;color:#F0EDFF;font-family:var(--font-display);font-size:15px;margin-bottom:6px;}
+
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .field.full{grid-column:1/-1;}
+  label{font-size:12.5px;font-weight:600;color:#DCD5F5;}
+  .optional-tag{font-weight:400;color:var(--text-muted);text-transform:none;font-size:11px;}
+  input[type=text],input[type=password],input[type=date],input[type=number],select,textarea{
+    font-family:var(--font-body);font-size:13.5px;padding:9px 11px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);color:var(--text);width:100%;
+  }
+  input::placeholder,textarea::placeholder{color:#5F5789;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--secondary);outline-offset:0;border-color:var(--secondary);}
+  textarea{resize:vertical;min-height:90px;font-family:var(--font-body);}
+  select{color-scheme:dark;}
+
+  .rating-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .rating-stars{display:flex;gap:4px;}
+  .star{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);}
+  .star.on{background:var(--accent);border-color:var(--accent);color:#2A1145;}
+
+  .status-options{display:flex;gap:8px;}
+  .status-opt{flex:1;text-align:center;padding:9px 6px;border:1px solid var(--border);border-radius:7px;font-size:12.5px;font-weight:600;color:var(--text-muted);background:var(--surface-2);}
+  .status-opt.sel-ok{background:var(--success-bg);border-color:var(--success);color:var(--success);}
+  .status-opt.sel-warn{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);}
+  .status-opt.sel-urgent{background:var(--urgent-bg);border-color:var(--urgent);color:var(--urgent);}
+
+  .btn{font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:7px;border:1px solid transparent;}
+  .btn-primary{background:linear-gradient(90deg,var(--primary-dim),#6D28D9);color:#fff;box-shadow:0 0 0 1px rgba(139,92,246,0.3),0 4px 16px rgba(139,92,246,0.25);width:100%;}
+  .btn-primary:hover{background:linear-gradient(90deg,#9D74F8,var(--primary-dim));}
+  .btn-secondary{background:var(--surface-2);border-color:var(--border);color:var(--text);}
+  .btn-secondary:hover{border-color:var(--secondary);}
+  .btn-small{font-size:12px;padding:6px 12px;}
+  .btn-toggle{background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:5px 10px;border-radius:100px;font-weight:600;}
+  .btn-toggle.on{background:var(--success-bg);border-color:var(--success);color:var(--success);}
+  .btn-approve{background:var(--success-bg);border:1px solid var(--success);color:var(--success);}
+  .btn-reject{background:var(--urgent-bg);border:1px solid var(--urgent);color:var(--urgent);}
+
+  .toast{position:fixed;bottom:24px;right:24px;background:linear-gradient(90deg,var(--primary-dim),#6D28D9);color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 8px 30px rgba(139,92,246,0.4);opacity:0;transform:translateY(8px);transition:all .25s ease;pointer-events:none;z-index:999;}
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  .bar-chart{display:flex;align-items:flex-end;gap:6px;height:80px;padding-top:6px;}
+  .bar{flex:1;background:linear-gradient(180deg,var(--secondary),var(--primary));border-radius:3px 3px 0 0;min-height:2px;}
+  .bar-labels{display:flex;gap:6px;margin-top:6px;}
+  .bar-labels span{flex:1;text-align:center;font-size:9.5px;color:var(--text-muted);font-family:var(--font-mono);}
+
+  .nn-select-list{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow-y:auto;}
+  .nn-select-item{padding:10px 12px;border-radius:7px;border:1px solid transparent;cursor:pointer;font-size:13px;}
+  .nn-select-item:hover{background:var(--surface-2);}
+  .nn-select-item.active{background:var(--surface-2);border-color:var(--secondary);}
+  .nn-select-item .nsi-name{font-weight:600;color:#F0EDFF;}
+  .nn-select-item .nsi-city{color:var(--text-muted);font-size:11.5px;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{text-align:left;color:var(--text-muted);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:0.03em;padding:0 8px 8px 8px;border-bottom:1px solid var(--border);}
+  td{padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .cell-mono{font-family:var(--font-mono);}
+
+  .avatar-circle{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:13px;color:#fff;flex-shrink:0;}
+  .member-select-item{display:flex;align-items:center;gap:10px;}
+
+  .survey-progress-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:18px;max-width:640px;}
+  .progress-top{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:8px;}
+  .progress-top span:last-child{font-family:var(--font-mono);color:var(--secondary);}
+  .progress-track{height:8px;background:var(--surface-2);border-radius:100px;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:100px;transition:width .2s ease;width:0%;}
+  .survey-time-note{font-size:11.5px;color:var(--text-muted);margin-top:8px;}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:5px 6px 5px 12px;font-size:12px;font-weight:600;}
+  .chip.linked{border-color:var(--secondary);}
+  .chip-remove{background:var(--border);border:none;color:var(--text);width:16px;height:16px;border-radius:50%;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;}
+
+  .duplicate-banner{background:var(--warn-bg);border:1px solid var(--warn);border-radius:var(--radius);padding:14px 16px;margin:14px 0;max-width:640px;}
+  .duplicate-banner .dup-title{font-weight:700;color:var(--warn);font-size:13px;margin-bottom:4px;}
+  .duplicate-banner .dup-desc{font-size:12.5px;color:var(--text-muted);margin-bottom:10px;}
+  .duplicate-banner .dup-actions{display:flex;gap:8px;}
+
+  .editing-banner{display:flex;justify-content:space-between;align-items:center;background:var(--surface-2);border:1px solid var(--secondary);border-radius:8px;padding:10px 14px;margin-bottom:14px;max-width:640px;font-size:12.5px;}
+
+  .region-card{border-radius:34px 12px 30px 14px;background:var(--surface);border:1px solid var(--border);padding:20px 22px;margin-bottom:18px;position:relative;overflow:hidden;}
+  .region-card::before{content:"";position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,0.18),transparent 70%);}
+  .region-card:nth-child(2n){border-radius:12px 34px 14px 30px;}
+  .region-card:nth-child(3n){border-radius:30px 14px 34px 12px;}
+
+  .map-state-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .map-state-bar select{width:auto;max-width:220px;}
+  .geo-map-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;overflow:hidden;}
+  .geo-empty{display:flex;align-items:center;justify-content:center;min-height:420px;color:var(--text-muted);font-size:12.5px;}
+  .geo-map-layout{display:flex;gap:16px;align-items:flex-start;}
+  .geo-map-main{flex:1;min-width:0;}
+  .geo-map-side{width:250px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:sticky;top:20px;}
+  .view-toggle{display:flex;gap:4px;background:var(--surface-2);padding:3px;border-radius:8px;}
+  .view-toggle-btn{font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:6px;color:var(--text-muted);background:none;border:none;}
+  .view-toggle-btn.active{background:var(--primary-dim);color:#fff;}
+  .region-title{font-family:var(--font-display);font-weight:700;font-size:16px;color:#F5F3FF;display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .region-count{font-family:var(--font-mono);font-size:11px;color:var(--text-muted);font-weight:400;}
+  .area-block{margin-bottom:14px;}
+  .area-title{font-size:11.5px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:8px;}
+  .nn-pin-wrap{display:flex;flex-wrap:wrap;gap:8px;}
+  .nn-pin{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:100px;padding:6px 12px 6px 8px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s ease;}
+  .nn-pin:hover{border-color:var(--secondary);}
+  .nn-pin-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+  .user-row{display:grid;grid-template-columns:1fr 1fr 90px auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .user-row:last-child{border-bottom:none;}
+
+  /* ================= MOBILE BOTTOM NAV + SHEETS ================= */
+  .bottom-tab-bar{display:none;}
+  .bottom-tab-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex:1;background:none;border:none;color:var(--text-muted);font-size:9.5px;font-weight:600;padding:6px 0;min-height:52px;}
+  .bottom-tab-item.active{color:#fff;}
+  .bottom-tab-item svg{width:20px;height:20px;}
+
+  .sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0);pointer-events:none;transition:background .25s ease;z-index:65;}
+  .sheet-backdrop.show{background:rgba(0,0,0,0.55);pointer-events:auto;}
+  .more-sheet{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom,0px)) 18px;box-shadow:0 -12px 30px rgba(0,0,0,0.5);transform:translateY(110%);transition:transform .25s ease;z-index:70;}
+  .more-sheet.show{transform:translateY(0);}
+  .more-sheet-item{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;color:var(--text);font-size:14.5px;font-weight:600;padding:13px 4px;text-align:left;}
+  .more-sheet-item svg{width:18px;height:18px;opacity:0.85;flex-shrink:0;}
+  .sheet-grabber{width:40px;height:4px;border-radius:100px;background:var(--border);margin:0 auto 14px auto;}
+
+  .mobile-back-btn{display:none;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--secondary);background:none;border:none;padding:0;margin-bottom:14px;}
+
+  @media(max-width:900px){
+    .sidebar{display:none;}
+    .main{padding:16px 16px 90px 16px;}
+    .stat-grid{grid-template-columns:repeat(2,1fr);}
+    .two-col{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .bottom-tab-bar{display:flex;position:fixed;left:0;right:0;bottom:0;background:linear-gradient(180deg,#150C31 0%,#0F0A26 100%);border-top:1px solid var(--border-soft);z-index:50;padding-bottom:env(safe-area-inset-bottom,0px);}
+    .mobile-back-btn.show-mobile{display:flex;}
+    .mobile-hide{display:none !important;}
+
+    /* bigger touch targets */
+    .btn, .btn-small{min-height:42px;}
+    .chip-remove{width:22px;height:22px;font-size:13px;}
+    .star{width:36px;height:36px;font-size:15px;}
+    .status-opt{padding:13px 6px;}
+    .btn-toggle{padding:8px 12px;min-height:34px;}
+
+    /* row-grids stack instead of columns */
+    .visit-row{grid-template-columns:1fr;gap:3px;padding:12px 0;}
+    .visit-row .visit-att{text-align:left;}
+    .user-row{grid-template-columns:1fr;gap:6px;}
+    .rotation-row{grid-template-columns:1fr;gap:8px;}
+
+    /* tables become stacked cards */
+    .table-mobile-cards table, .table-mobile-cards thead, .table-mobile-cards tbody, .table-mobile-cards tr{display:block;width:100%;}
+    .table-mobile-cards thead{display:none;}
+    .table-mobile-cards tr{margin-bottom:10px;border:1px solid var(--border);border-radius:9px;padding:10px 12px;background:var(--surface-2);}
+    .table-mobile-cards td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border:none;padding:5px 0;text-align:right;}
+    .table-mobile-cards td::before{content:attr(data-label);font-weight:600;color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:0.03em;text-align:left;flex-shrink:0;}
+  }
+
+  @media(max-width:760px){
+    .geo-map-layout{flex-direction:column;}
+    .geo-map-side{width:100%;position:fixed;left:0;right:0;bottom:0;max-height:75vh;border-radius:18px 18px 0 0;box-shadow:0 -12px 30px rgba(0,0,0,0.5);transform:translateY(110%);transition:transform .25s ease;z-index:70;overflow-y:auto;}
+    .geo-map-side.sheet-open{transform:translateY(0);}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH SCREEN ================= -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 17.5C3.5 17.5 2 15.7 2 13.7C2 11.9 3.3 10.4 5.1 10.1C5.6 7.2 8.1 5 11.2 5C13.9 5 16.2 6.7 17 9.1C19.3 9.4 21 11.3 21 13.6C21 16.1 18.9 18 16.4 18L6 17.5Z" stroke="#C4B5FD" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      Cloud QC
+    </div>
+    <div class="auth-sub">Young Muslim &middot; QC Ops</div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" data-authtab="login">Log in</div>
+      <div class="auth-tab" data-authtab="signup">Sign up</div>
+    </div>
+
+    <div id="auth-msg-holder"></div>
+
+    <form id="login-form">
+      <div class="field"><label>Username</label><input type="text" id="login-username" required></div>
+      <div class="field"><label>Password</label><input type="password" id="login-password" required></div>
+      <button type="submit" class="btn btn-primary">Log in</button>
+    </form>
+
+    <form id="signup-form" class="hidden">
+      <div class="field"><label>Full name</label><input type="text" id="signup-name" required></div>
+      <div class="field"><label>Choose a username</label><input type="text" id="signup-username" required></div>
+      <div class="field"><label>Choose a password</label><input type="password" id="signup-password" required></div>
+      <button type="submit" class="btn btn-primary">Create account</button>
+    </form>
+
+    <div class="auth-divider">or</div>
+    <button id="google-btn" class="btn-google">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.26 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.05H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.95l3.66-2.85z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.05l3.66 2.85C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
+      Continue with Google
+    </button>
+
+    <div class="auth-fine">This is a working prototype: passwords are not encrypted and logins are not saved when you refresh the page. "Continue with Google" is a placeholder — real Google Sign-In needs OAuth credentials and a backend, which come later.</div>
+    <div class="auth-demo">Demo admin login &mdash; username: admin / password: admin</div>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div class="app hidden" id="app-shell">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 17.5C3.5 17.5 2 15.7 2 13.7C2 11.9 3.3 10.4 5.1 10.1C5.6 7.2 8.1 5 11.2 5C13.9 5 16.2 6.7 17 9.1C19.3 9.4 21 11.3 21 13.6C21 16.1 18.9 18 16.4 18L6 17.5Z" stroke="#C4B5FD" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        Cloud QC
+      </div>
+      <div class="brand-sub">Young Muslim &middot; QC Ops</div>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="avatar-circle" id="sidebar-avatar">?</div>
+      <span id="sidebar-username" style="font-size:12.5px;font-weight:600;"></span>
+    </div>
+
+    <div class="nav-item active" data-tab="dashboard">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span class="nav-label">Dashboard</span>
+    </div>
+    <div class="nav-item" data-tab="feedback">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v12H8l-4 4V4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span class="nav-label">Submit Feedback</span>
+    </div>
+    <div class="nav-item" data-tab="neighbornets">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="6" r="2.5" stroke="currentColor" stroke-width="1.6"/><circle cx="6" cy="18" r="2.5" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="18" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8.5V13M12 13L7.5 16M12 13l4.5 3" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span class="nav-label">Neighbornets</span>
+    </div>
+    <div class="nav-item" data-tab="map">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M3 8l6-3 6 3 6-3v13l-6 3-6-3-6 3V8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 5v13M15 8v13" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span class="nav-label">Network Map</span>
+    </div>
+    <div class="nav-item" data-tab="team">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6"/><path d="M16 4.5a3 3 0 0 1 0 5.9M21 20c0-2.8-2-5.1-4.5-5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="nav-label">Cloud Team</span>
+    </div>
+    <div class="nav-item" data-tab="rotation">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="nav-label">Rotation</span>
+    </div>
+    <div class="nav-item hidden" data-tab="admin" id="nav-admin">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span class="nav-label">Admin</span>
+      <span class="nav-admin-tag" id="admin-pending-tag"></span>
+    </div>
+
+    <button class="btn-logout" id="logout-btn">Log out</button>
+    <div class="sidebar-footer">Prototype &middot; data is shared across everyone using this link</div>
+  </div>
+
+  <!-- ================= MOBILE BOTTOM NAV ================= -->
+  <div class="bottom-tab-bar">
+    <button class="bottom-tab-item active" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="bottom-tab-item" data-tab="feedback">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 4h16v12H8l-4 4V4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span>Feedback</span>
+    </button>
+    <button class="bottom-tab-item" data-tab="neighbornets">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="6" r="2.5" stroke="currentColor" stroke-width="1.6"/><circle cx="6" cy="18" r="2.5" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="18" r="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8.5V13M12 13L7.5 16M12 13l4.5 3" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>NNs</span>
+    </button>
+    <button class="bottom-tab-item" data-tab="team">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6"/><path d="M16 4.5a3 3 0 0 1 0 5.9M21 20c0-2.8-2-5.1-4.5-5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Team</span>
+    </button>
+    <button class="bottom-tab-item" id="more-tab-btn">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>
+      <span>More</span>
+    </button>
+  </div>
+
+  <div class="sheet-backdrop" id="more-sheet-backdrop"></div>
+  <div class="more-sheet" id="more-sheet">
+    <div class="sheet-grabber"></div>
+    <button class="more-sheet-item" data-tab="map">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 8l6-3 6 3 6-3v13l-6 3-6-3-6 3V8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 5v13M15 8v13" stroke="currentColor" stroke-width="1.6"/></svg>
+      Network Map
+    </button>
+    <button class="more-sheet-item" data-tab="rotation">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Rotation
+    </button>
+    <button class="more-sheet-item hidden" id="more-admin-item" data-tab="admin">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      Admin
+    </button>
+    <div style="border-top:1px solid var(--border);margin:6px 0;"></div>
+    <button class="more-sheet-item" id="more-logout-item">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Log out
+    </button>
+  </div>
+
+  <div class="main">
+
+    <div class="shared-banner">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M12 2L4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z" stroke="#38BDF8" stroke-width="1.6"/></svg>
+      This is a prototype — everyone with this link sees and edits the same shared data.
+    </div>
+
+    <!-- ================= DASHBOARD ================= -->
+    <div id="tab-dashboard">
+      <div class="page-head">
+        <div class="page-title">Cloud Dashboard</div>
+        <div class="page-desc">Overview of QC visits across all neighbornets.</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Neighbornets</div><div class="stat-value" id="stat-nn">0</div></div>
+        <div class="stat-card"><div class="stat-label">Visits logged</div><div class="stat-value" id="stat-visits">0</div></div>
+        <div class="stat-card"><div class="stat-label">Avg. attendance</div><div class="stat-value" id="stat-avg">0</div></div>
+        <div class="stat-card"><div class="stat-label">Needs follow-up</div><div class="stat-value" id="stat-followup">0</div></div>
+      </div>
+      <div class="card hidden" id="goal-card"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="section-label">Network</div>
+          <div class="orbit-wrap" id="orbit-holder"></div>
+        </div>
+        <div class="card">
+          <div class="section-label">Recent visits</div>
+          <div id="recent-visits"></div>
+        </div>
+      </div>
+      <div style="margin-top:24px;">
+        <div class="section-label">
+          <span>Neighbornets</span>
+          <div class="view-toggle">
+            <button type="button" class="view-toggle-btn active" data-nnview="grid">Grid</button>
+            <button type="button" class="view-toggle-btn" data-nnview="map">Map</button>
+          </div>
+        </div>
+        <div class="nn-grid" id="dashboard-nn-grid"></div>
+        <div id="dashboard-nn-map" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- ================= FEEDBACK / SURVEY ================= -->
+    <div id="tab-feedback" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Submit QC Feedback</div>
+        <div class="page-desc">Log notes from a neighbornet visit.</div>
+      </div>
+
+      <div class="editing-banner hidden" id="editing-banner">
+        <span id="editing-banner-text"></span>
+        <button type="button" class="btn btn-secondary btn-small" id="cancel-edit-btn">Cancel edit</button>
+      </div>
+
+      <div class="survey-progress-wrap">
+        <div class="progress-top"><span>Your progress</span><span id="survey-progress-pct">0%</span></div>
+        <div class="progress-track"><div class="progress-fill" id="survey-progress-fill"></div></div>
+        <div class="survey-time-note">Takes about 5 minutes. Only the feedback paragraph at the bottom is required — everything else is a bonus.</div>
+      </div>
+
+      <div id="duplicate-banner-holder"></div>
+
+      <div class="card" style="max-width:640px;">
+        <div id="feedback-empty" class="empty-state hidden">
+          <strong>Add a neighbornet first</strong>
+          There is nothing to submit feedback for yet.
+        </div>
+
+        <form id="feedback-form">
+          <div class="field full">
+            <label>Submitting as</label>
+            <div style="padding:9px 11px;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;font-weight:600;" id="fb-submitter-display"></div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Neighbornet</label>
+              <select id="fb-nn" required></select>
+            </div>
+            <div class="field">
+              <label>Visit date</label>
+              <input type="date" id="fb-date" required>
+            </div>
+            <div class="field">
+              <label>Average group size <span class="optional-tag">optional</span></label>
+              <input type="number" id="fb-attendance" min="0" placeholder="e.g. 24">
+            </div>
+            <div class="field">
+              <label>Average age of neighbornet <span class="optional-tag">optional</span></label>
+              <input type="number" id="fb-avgage" min="0" placeholder="e.g. 15">
+            </div>
+          </div>
+
+          <div class="field full">
+            <label>Anyone else from Cloud who visited with you? <span class="optional-tag">optional — counts as their visit too</span></label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="fb-covisitor-input" list="member-list" placeholder="Type a name">
+              <button type="button" class="btn btn-secondary btn-small" id="fb-covisitor-add" style="flex-shrink:0;">Add</button>
+            </div>
+            <div id="fb-covisitor-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+          </div>
+
+          <div class="field full">
+            <label>How was the food? <span class="optional-tag">optional</span></label>
+            <div class="rating-row"><div class="rating-stars" data-rating="food"></div></div>
+          </div>
+          <div class="field full">
+            <label>How was the leadership? <span class="optional-tag">optional</span></label>
+            <div class="rating-row"><div class="rating-stars" data-rating="leadership"></div></div>
+          </div>
+          <div class="field full">
+            <label>How was the halaqah? <span class="optional-tag">optional</span></label>
+            <div class="rating-row"><div class="rating-stars" data-rating="halaqah"></div></div>
+          </div>
+
+          <div class="field full">
+            <label>Overall status <span class="optional-tag">optional</span></label>
+            <div class="status-options">
+              <div class="status-opt" data-status="ok">On track</div>
+              <div class="status-opt" data-status="warn">Needs follow-up</div>
+              <div class="status-opt" data-status="urgent">Urgent</div>
+            </div>
+          </div>
+
+          <div class="field full">
+            <label>Feedback paragraph <span class="optional-tag" style="color:var(--secondary);">required</span></label>
+            <textarea id="fb-notes" placeholder="What did you observe? This is the only field that must be filled in to submit."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="fb-submit-btn" style="width:auto;">Submit feedback</button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:640px;margin-top:20px;">
+        <div class="section-label">Your submission history</div>
+        <div id="my-submissions"></div>
+      </div>
+    </div>
+
+    <!-- ================= NEIGHBORNETS ================= -->
+    <div id="tab-neighbornets" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Neighbornets</div>
+        <div class="page-desc">All local groups, their visit history, and attendance trend.</div>
+      </div>
+
+      <div class="card hidden" id="add-nn-card" style="margin-bottom:20px;max-width:640px;">
+        <div class="section-label">Add a neighbornet <span class="badge badge-neutral">Admin only</span></div>
+        <form id="add-nn-form">
+          <div class="form-grid">
+            <div class="field"><label>Name</label><input type="text" id="new-nn-name" placeholder="e.g. Paterson" required></div>
+            <div class="field"><label>City / area name <span class="optional-tag">optional</span></label><input type="text" id="new-nn-city" placeholder="e.g. Paterson, NJ"></div>
+            <div class="field"><label>Region</label><input type="text" id="new-nn-region" list="region-list" placeholder="e.g. Northeast" required></div>
+            <div class="field"><label>Sub-area</label><input type="text" id="new-nn-area" list="area-list" placeholder="e.g. North New Jersey" required></div>
+            <div class="field"><label>State (2-letter) <span class="optional-tag">for the map</span></label><input type="text" id="new-nn-state" placeholder="e.g. NJ" maxlength="2" style="text-transform:uppercase;"></div>
+            <div class="field"><label>Latitude <span class="optional-tag">for the map</span></label><input type="text" id="new-nn-lat" placeholder="e.g. 40.8976"></div>
+            <div class="field"><label>Longitude <span class="optional-tag">for the map</span></label><input type="text" id="new-nn-lng" placeholder="e.g. -74.0154"></div>
+            <div class="field"><label>Contact email <span class="optional-tag">optional</span></label><input type="text" id="new-nn-email" placeholder="nnc.name@youngmuslims.com"></div>
+            <div class="field"><label>Instagram <span class="optional-tag">optional</span></label><input type="text" id="new-nn-ig" placeholder="@ym.name.brothers"></div>
+          </div>
+          <datalist id="region-list"></datalist>
+          <datalist id="area-list"></datalist>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Add neighbornet</button>
+        </form>
+      </div>
+      <div class="empty-state" id="add-nn-locked" style="max-width:640px;">Only admins can add new neighbornets. Ask an admin to add yours.</div>
+
+      <div class="two-col">
+        <div class="card" id="nn-list-card">
+          <div class="section-label">All neighbornets</div>
+          <div class="nn-select-list" id="nn-select-list"></div>
+        </div>
+        <div class="card" id="nn-detail">
+          <div class="empty-state"><strong>No neighbornet selected</strong>Pick one from the list to see its history.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= NETWORK MAP ================= -->
+    <div id="tab-map" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Network Map</div>
+        <div class="page-desc">Real state outlines, glowing pins for each neighbornet — green / amber / red shows current status. Add a new state's worth of coordinates and it appears here automatically.</div>
+      </div>
+      <div id="map-regions"></div>
+    </div>
+
+    <!-- ================= CLOUD TEAM ================= -->
+    <div id="tab-team" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Cloud Team</div>
+        <div class="page-desc">Every approved Cloud member and the status of their visits.</div>
+      </div>
+      <div class="stat-grid" id="team-stat-grid"></div>
+      <div class="two-col">
+        <div class="card" id="member-list-card">
+          <div class="section-label">All members</div>
+          <div class="nn-select-list" id="member-select-list"></div>
+        </div>
+        <div class="card" id="member-detail">
+          <div class="empty-state"><strong>No member selected</strong>Pick someone from the list to see their visit history.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ROTATION ================= -->
+    <div id="tab-rotation" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Rotation</div>
+        <div class="page-desc">Which Cloud/QC members are currently paired with each neighbornet. You can join or leave a pairing for yourself; admins can assign anyone.</div>
+      </div>
+      <div class="card">
+        <div id="rotation-empty" class="empty-state hidden"><strong>No neighbornets yet</strong>Add neighbornets first, then assign partners here.</div>
+        <div id="rotation-list"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="section-label">Assignment history</div>
+        <div id="rotation-history"></div>
+      </div>
+    </div>
+
+    <!-- ================= ADMIN ================= -->
+    <div id="tab-admin" class="hidden">
+      <div class="page-head">
+        <div class="page-title">Admin</div>
+        <div class="page-desc">Approve accounts, manage roles, and adjust dashboard numbers.</div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-label">Dashboard adjustments</div>
+        <div class="form-grid">
+          <div class="field"><label>Manual visit adjustment</label><input type="number" id="admin-visit-offset" value="0"></div>
+          <div class="field"><label>Visit goal <span class="optional-tag">optional</span></label><input type="number" id="admin-visit-goal" placeholder="e.g. 100"></div>
+        </div>
+        <button class="btn btn-primary" id="admin-save-adjustments" style="width:auto;">Save</button>
+        <div style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Use the manual adjustment to account for visits that happened outside the app. It is added directly to "Visits logged" on the dashboard.</div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-label">Pending approval</div>
+        <div id="pending-users"></div>
+      </div>
+      <div class="card">
+        <div class="section-label">All accounts</div>
+        <div id="all-users"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<datalist id="member-list"></datalist>
+
+<script>
+/* ---------------- state + storage ---------------- */
+const STORAGE_KEY = 'cloud-qc-data';
+let state = { neighbornets: [], feedback: [], partners: {}, rotationHistory: [], members: [], users: [], dashboardAdjustments: { manualOffset: 0, goal: null } };
+let ratings = { food: 0, leadership: 0, halaqah: 0 };
+let selectedStatus = null;
+let selectedNnId = null;
+let selectedMemberId = null;
+let dashboardNnView = 'grid';
+let currentUser = null;
+let coVisitorsDraft = [];
+let editingEntryId = null;
+let pendingDuplicateEntry = null;
+let pendingExistingMatch = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){
+      state = JSON.parse(res.value);
+      state.neighbornets = state.neighbornets || [];
+      state.feedback = state.feedback || [];
+      state.partners = state.partners || {};
+      state.rotationHistory = state.rotationHistory || [];
+      state.members = state.members || [];
+      state.users = state.users || [];
+      state.dashboardAdjustments = state.dashboardAdjustments || { manualOffset: 0, goal: null };
+    }
+  }catch(e){ /* key does not exist yet */ }
+
+  let needsSave = false;
+  if(!state.users.length){
+    state.users.push({ id: uid(), username:'admin', password:'admin', name:'Admin', method:'local', status:'approved', role:'admin' });
+    needsSave = true;
+  }
+  if(!state.neighbornets.length){
+    const seed = [
+      ['Teaneck','North New Jersey','nnc.teaneck@youngmuslims.com','@ym.teaneck.brothers',40.8976,-74.0154],
+      ['Paramus','North New Jersey','nnc.paramus@youngmuslims.com','@ym.paramus.brothers',40.9445,-74.0754],
+      ['Bayonne','North New Jersey','nnc.bayonne@youngmuslims.com','@ym.bayonne.brothers',40.6687,-74.1143],
+      ['Jersey City','North New Jersey','nnc.jerseycity@youngmuslims.com','@ym.jerseycity.brothers',40.7178,-74.0431],
+      ['Newark','North New Jersey','nnc.newark@youngmuslims.com','@ym.newark.brothers',40.7357,-74.1724],
+      ['Piscataway','South New Jersey','nnc.piscataway@youngmuslims.com','@ym.piscataway.brothers',40.5548,-74.4646],
+      ['Edison','South New Jersey','nnc.edison@youngmuslims.com','@ym.edison.brothers',40.5187,-74.4121],
+      ['South Brunswick','South New Jersey','nnc.southbrunswick@youngmuslims.com','@tm.southbrunswick.brothers',40.3454,-74.5227],
+      ['Montyboro','South New Jersey','nnc.montyboro@youngmuslims.com','@ym.montyboro.brothers',40.3157,-74.2632],
+      ['South Jersey','South New Jersey','nnc.southjersey@youngmuslims.com','@ym.southjersey.brothers',39.9348,-75.0307],
+      ['Woodbridge','South New Jersey','nnc.woodbridge@youngmuslims.com','@ym.woodbridge.brothers',40.5576,-74.2846],
+      ['Old Bridge','South New Jersey','nnc.oldbridge@youngmuslims.com','@ym.oldbridge.brothers',40.4148,-74.3646],
+      ['571','South New Jersey','nnc.woodbridge@youngmuslims.com','@ym.571.brothers',40.3223,-74.4302]
+    ];
+    seed.forEach(s=>{
+      state.neighbornets.push({ id: uid(), name: s[0], region: 'Northeast', area: s[1], city:'', contactEmail: s[2], instagram: s[3], state:'NJ', lat: s[4], lng: s[5] });
+    });
+    needsSave = true;
+  }
+  if(needsSave) await saveState();
+  ensureMember('Admin');
+  showAuthScreen();
+}
+
+async function saveState(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+  }catch(e){
+    showToast('Could not save — try again');
+    console.error(e);
+  }
+}
+
+function ensureMember(name){
+  const existing = state.members.find(m=>m.name.toLowerCase()===name.toLowerCase());
+  if(existing) return existing;
+  const m = { id: uid(), name };
+  state.members.push(m);
+  return m;
+}
+
+function initials(name){
+  return name.trim().split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase();
+}
+
+/* ================= AUTH ================= */
+document.querySelectorAll('.auth-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const which = tab.dataset.authtab;
+    document.getElementById('login-form').classList.toggle('hidden', which!=='login');
+    document.getElementById('signup-form').classList.toggle('hidden', which!=='signup');
+    document.getElementById('auth-msg-holder').innerHTML = '';
+  });
+});
+
+function authMsg(text, kind){
+  document.getElementById('auth-msg-holder').innerHTML = `<div class="auth-msg ${kind}">${text}</div>`;
+}
+
+document.getElementById('login-form').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const user = state.users.find(u=>u.username.toLowerCase()===username.toLowerCase() && u.password===password);
+  if(!user){ authMsg('Incorrect username or password.', 'error'); return; }
+  if(user.status==='pending'){ authMsg('Your account is still waiting for admin approval.', 'error'); return; }
+  currentUser = user;
+  enterApp();
+});
+
+document.getElementById('signup-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const name = document.getElementById('signup-name').value.trim();
+  const username = document.getElementById('signup-username').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if(state.users.find(u=>u.username.toLowerCase()===username.toLowerCase())){
+    authMsg('That username is already taken.', 'error');
+    return;
+  }
+  state.users.push({ id: uid(), username, password, name, method:'local', status:'pending', role:'user' });
+  await saveState();
+  authMsg('Account created. An admin needs to approve you before you can log in.', 'info');
+  e.target.reset();
+});
+
+document.getElementById('google-btn').addEventListener('click', async ()=>{
+  const name = window.prompt('Placeholder Google Sign-In — enter the display name to use:');
+  if(!name) return;
+  const username = 'google_' + name.trim().toLowerCase().replace(/\s+/g,'_');
+  if(state.users.find(u=>u.username===username)){
+    authMsg('An account for that name already exists.', 'error');
+    return;
+  }
+  state.users.push({ id: uid(), username, password:null, name: name.trim(), method:'google', status:'pending', role:'user' });
+  await saveState();
+  authMsg('Account created via the Google placeholder. An admin needs to approve you before you can log in.', 'info');
+});
+
+document.getElementById('logout-btn').addEventListener('click', ()=>{
+  currentUser = null;
+  showAuthScreen();
+});
+
+document.querySelectorAll('.view-toggle-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.view-toggle-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    dashboardNnView = btn.dataset.nnview;
+    renderDashboardNnSection();
+  });
+});
+
+function renderDashboardNnSection(){
+  document.getElementById('dashboard-nn-grid').classList.toggle('hidden', dashboardNnView !== 'grid');
+  document.getElementById('dashboard-nn-map').classList.toggle('hidden', dashboardNnView !== 'map');
+  if(dashboardNnView === 'map'){
+    renderGeoMapWidget('dashboard-nn-map', 'dash');
+  }
+}
+
+function showAuthScreen(){
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-shell').classList.add('hidden');
+}
+
+function enterApp(){
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.remove('hidden');
+  document.getElementById('sidebar-avatar').textContent = initials(currentUser.name || currentUser.username);
+  document.getElementById('sidebar-username').textContent = currentUser.name || currentUser.username;
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('nav-admin').classList.toggle('hidden', !isAdmin);
+  document.getElementById('more-admin-item').classList.toggle('hidden', !isAdmin);
+  document.getElementById('add-nn-card').classList.toggle('hidden', !isAdmin);
+  document.getElementById('add-nn-locked').classList.toggle('hidden', isAdmin);
+  renderAll();
+}
+
+/* ---------------- mobile helpers ---------------- */
+function isNarrow(px){ return window.matchMedia(`(max-width:${px}px)`).matches; }
+
+function showMobileDetail(listId, detailId){
+  if(!isNarrow(900)) return;
+  document.getElementById(listId).classList.add('mobile-hide');
+  document.getElementById(detailId).classList.remove('mobile-hide');
+}
+function showMobileList(listId, detailId){
+  document.getElementById(listId).classList.remove('mobile-hide');
+  if(isNarrow(900)) document.getElementById(detailId).classList.add('mobile-hide');
+}
+
+function openMoreSheet(){
+  document.getElementById('more-sheet').classList.add('show');
+  document.getElementById('more-sheet-backdrop').classList.add('show');
+}
+function closeMoreSheet(){
+  document.getElementById('more-sheet').classList.remove('show');
+  document.getElementById('more-sheet-backdrop').classList.remove('show');
+}
+document.getElementById('more-tab-btn').addEventListener('click', openMoreSheet);
+document.getElementById('more-sheet-backdrop').addEventListener('click', closeMoreSheet);
+document.getElementById('more-logout-item').addEventListener('click', ()=>{
+  closeMoreSheet();
+  currentUser = null;
+  showAuthScreen();
+});
+
+function closeMapSheetFor(prefix){
+  document.getElementById(`${prefix}-map-detail-panel`)?.classList.remove('sheet-open');
+  document.getElementById(`${prefix}-map-sheet-backdrop`)?.classList.remove('show');
+}
+
+/* ---------------- nav ---------------- */
+function switchTab(tab){
+  document.querySelectorAll('[data-tab]').forEach(el=>el.classList.toggle('active', el.dataset.tab===tab));
+  document.getElementById('more-tab-btn').classList.toggle('active', ['map','rotation','admin'].includes(tab));
+  ['dashboard','feedback','neighbornets','map','team','rotation','admin'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('hidden', t!==tab);
+  });
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='feedback') renderFeedbackForm();
+  if(tab==='neighbornets') renderNeighbornetsTab();
+  if(tab==='map') renderMapTab();
+  if(tab==='team') renderTeamTab();
+  if(tab==='rotation') renderRotationTab();
+  if(tab==='admin') renderAdminTab();
+  closeMoreSheet();
+  showMobileList('nn-list-card','nn-detail');
+  showMobileList('member-list-card','member-detail');
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('[data-tab]').forEach(item=>{
+  item.addEventListener('click', ()=>switchTab(item.dataset.tab));
+});
+
+function renderAll(){
+  renderDashboard();
+  renderFeedbackForm();
+  renderNeighbornetsTab();
+  renderMapTab();
+  renderTeamTab();
+  renderRotationTab();
+  renderAdminTab();
+  refreshMemberList();
+}
+
+function refreshMemberList(){
+  document.getElementById('member-list').innerHTML = state.members.map(m=>`<option value="${m.name}">`).join('');
+}
+
+/* ---------------- shared helpers ---------------- */
+function statusMeta(status){
+  if(status==='ok') return {label:'On track', cls:'badge-success'};
+  if(status==='warn') return {label:'Needs follow-up', cls:'badge-warn'};
+  if(status==='urgent') return {label:'Urgent', cls:'badge-urgent'};
+  return {label:'Not rated', cls:'badge-neutral'};
+}
+function ragColor(status){
+  if(status==='ok') return '#34D399';
+  if(status==='warn') return '#FBBF24';
+  if(status==='urgent') return '#FB7185';
+  return '#948CBB';
+}
+function latestVisitFor(nnId){
+  const visits = state.feedback.filter(f=>f.nnId===nnId).sort((a,b)=>b.date.localeCompare(a.date));
+  return visits[0] || null;
+}
+function visitCountForEntry(entry){
+  return 1 + (entry.coVisitors ? entry.coVisitors.length : 0);
+}
+function totalComputedVisits(){
+  return state.feedback.reduce((s,f)=>s+visitCountForEntry(f),0);
+}
+function displayedVisitTotal(){
+  return Math.max(0, totalComputedVisits() + (state.dashboardAdjustments.manualOffset || 0));
+}
+function visitedByLabel(entry){
+  const extra = (entry.coVisitors||[]).map(c=>c.name);
+  return extra.length ? `${entry.submittedBy} + ${extra.join(', ')}` : entry.submittedBy;
+}
+
+/* ---------------- dashboard ---------------- */
+function renderDashboard(){
+  const nn = state.neighbornets;
+  const visits = state.feedback;
+
+  document.getElementById('stat-nn').textContent = nn.length;
+  document.getElementById('stat-visits').textContent = displayedVisitTotal();
+  const avgAtt = visits.length ? Math.round(visits.reduce((s,v)=>s+Number(v.attendance||0),0)/visits.length) : 0;
+  document.getElementById('stat-avg').textContent = avgAtt;
+  const followup = nn.filter(n=>{
+    const lv = latestVisitFor(n.id);
+    return lv && (lv.status==='warn' || lv.status==='urgent');
+  }).length;
+  document.getElementById('stat-followup').textContent = followup;
+
+  const goalCard = document.getElementById('goal-card');
+  const goal = state.dashboardAdjustments.goal;
+  if(goal && goal > 0){
+    const total = displayedVisitTotal();
+    const pct = Math.min(100, Math.round((total/goal)*100));
+    goalCard.classList.remove('hidden');
+    goalCard.innerHTML = `
+      <div class="progress-top"><span>Visit goal progress</span><span>${total} / ${goal}</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    `;
+  }else{
+    goalCard.classList.add('hidden');
+  }
+
+  renderOrbit(nn);
+
+  const recentHolder = document.getElementById('recent-visits');
+  const recent = [...visits].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  if(!recent.length){
+    recentHolder.innerHTML = '<div class="empty-state"><strong>No visits logged yet</strong>Submit your first QC visit to see it here.</div>';
+  }else{
+    recentHolder.innerHTML = recent.map(v=>{
+      const n = nn.find(x=>x.id===v.nnId);
+      return `<div class="visit-row">
+        <div class="visit-date">${v.date}</div>
+        <div><div class="visit-nn">${n ? n.name : 'Unknown'}</div><div class="visit-sub">by ${visitedByLabel(v)}</div></div>
+        <div class="visit-att">${v.attendance || '—'}</div>
+        <div><span class="badge ${statusMeta(v.status).cls}">${statusMeta(v.status).label}</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  const grid = document.getElementById('dashboard-nn-grid');
+  if(!nn.length){
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><strong>No neighbornets yet</strong>An admin needs to add one to get started.</div>';
+  }else{
+    grid.innerHTML = nn.map(n=>{
+      const lv = latestVisitFor(n.id);
+      const meta = lv ? statusMeta(lv.status) : {label:'No visits yet', cls:'badge-neutral'};
+      const partner = state.partners[n.id];
+      const partnerLabel = partner && partner.members && partner.members.length ? partner.members.join(', ') : 'Unassigned';
+      return `<div class="nn-card" data-goto-nn="${n.id}">
+        <div class="nn-card-top">
+          <div><div class="nn-name">${n.name}</div><div class="nn-city">${n.area || n.city || ''}</div></div>
+          <span class="badge ${meta.cls}">${meta.label}</span>
+        </div>
+        <div class="nn-meta">
+          <div>Last visit: ${lv ? lv.date : '—'}</div>
+          <div>Partners: ${partnerLabel}</div>
+        </div>
+      </div>`;
+    }).join('');
+    grid.querySelectorAll('[data-goto-nn]').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        selectedNnId = card.dataset.gotoNn;
+        document.querySelector('.nav-item[data-tab="neighbornets"]').click();
+      });
+    });
+  }
+  renderDashboardNnSection();
+}
+
+function renderOrbit(nn){
+  const holder = document.getElementById('orbit-holder');
+  const w = 320, h = 220, cx = w/2, cy = h/2 + 6;
+  if(!nn.length){
+    holder.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <circle cx="${cx}" cy="${cy}" r="30" fill="#8B5CF6" style="filter:drop-shadow(0 0 10px rgba(139,92,246,0.7))"/>
+      <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Space Grotesk" font-size="11" fill="#fff" font-weight="600">Cloud</text>
+    </svg>`;
+    return;
+  }
+  const radius = 82;
+  let nodes = '', lines = '';
+  nn.forEach((n,i)=>{
+    const angle = (i / nn.length) * Math.PI * 2 - Math.PI/2;
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    const lv = latestVisitFor(n.id);
+    const color = ragColor(lv ? lv.status : null);
+    lines += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#332963" stroke-width="1.4"/>`;
+    const shortName = n.name.length > 10 ? n.name.slice(0,9)+'…' : n.name;
+    nodes += `<circle cx="${x}" cy="${y}" r="16" fill="${color}"/>
+      <text x="${x}" y="${y+30}" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#948CBB">${shortName}</text>`;
+  });
+  holder.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    ${lines}
+    <circle cx="${cx}" cy="${cy}" r="30" fill="#8B5CF6" style="filter:drop-shadow(0 0 10px rgba(139,92,246,0.7))"/>
+    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Space Grotesk" font-size="11" fill="#fff" font-weight="600">Cloud</text>
+    ${nodes}
+  </svg>`;
+}
+
+/* ---------------- feedback form / survey ---------------- */
+function renderStars(){
+  document.querySelectorAll('.rating-stars').forEach(el=>{
+    const key = el.dataset.rating;
+    el.innerHTML = '';
+    for(let i=1;i<=5;i++){
+      const s = document.createElement('div');
+      s.className = 'star' + (ratings[key]>=i ? ' on' : '');
+      s.textContent = i;
+      s.addEventListener('click', ()=>{
+        ratings[key] = i;
+        renderStars();
+        updateSurveyProgress();
+      });
+      el.appendChild(s);
+    }
+  });
+}
+
+function updateSurveyProgress(){
+  const trackedFields = [
+    document.getElementById('fb-attendance').value,
+    document.getElementById('fb-avgage').value,
+    ratings.food > 0 ? 'x' : '',
+    ratings.leadership > 0 ? 'x' : '',
+    ratings.halaqah > 0 ? 'x' : '',
+    selectedStatus || '',
+    coVisitorsDraft.length ? 'x' : '',
+    document.getElementById('fb-notes').value.trim()
+  ];
+  const filled = trackedFields.filter(v=>v && v.toString().length).length;
+  const pct = Math.round((filled / trackedFields.length) * 100);
+  document.getElementById('survey-progress-fill').style.width = pct + '%';
+  document.getElementById('survey-progress-pct').textContent = pct + '%';
+}
+
+function renderCoVisitorChips(){
+  const holder = document.getElementById('fb-covisitor-chips');
+  holder.innerHTML = coVisitorsDraft.map((c,i)=>`
+    <span class="chip ${c.linked?'linked':''}">${c.name}<button type="button" class="chip-remove" data-remove-covisitor="${i}">&times;</button></span>
+  `).join('');
+  holder.querySelectorAll('[data-remove-covisitor]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      coVisitorsDraft.splice(Number(btn.dataset.removeCovisitor),1);
+      renderCoVisitorChips();
+      updateSurveyProgress();
+    });
+  });
+}
+
+document.getElementById('fb-covisitor-add').addEventListener('click', ()=>{
+  const input = document.getElementById('fb-covisitor-input');
+  const name = input.value.trim();
+  if(!name) return;
+  if(currentUser && name.toLowerCase()===currentUser.name.toLowerCase()){ showToast("That's you already"); return; }
+  if(coVisitorsDraft.find(c=>c.name.toLowerCase()===name.toLowerCase())){ showToast('Already added'); return; }
+  coVisitorsDraft.push({ name, linked:false });
+  input.value = '';
+  renderCoVisitorChips();
+  updateSurveyProgress();
+});
+
+function renderFeedbackForm(){
+  const sel = document.getElementById('fb-nn');
+  const empty = document.getElementById('feedback-empty');
+  const form = document.getElementById('feedback-form');
+  document.getElementById('fb-submitter-display').textContent = currentUser ? currentUser.name : '';
+  if(!state.neighbornets.length){
+    empty.classList.remove('hidden');
+    form.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  form.classList.remove('hidden');
+  sel.innerHTML = state.neighbornets.map(n=>`<option value="${n.id}">${n.name}${n.area ? ' — '+n.area : ''}</option>`).join('');
+  if(!editingEntryId) document.getElementById('fb-date').valueAsDate = new Date();
+  renderStars();
+  renderCoVisitorChips();
+  updateSurveyProgress();
+  renderMySubmissions();
+}
+
+['fb-attendance','fb-avgage','fb-notes'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateSurveyProgress);
+});
+
+document.querySelectorAll('.status-opt').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    selectedStatus = opt.dataset.status;
+    document.querySelectorAll('.status-opt').forEach(o=>o.classList.remove('sel-ok','sel-warn','sel-urgent'));
+    opt.classList.add('sel-'+selectedStatus);
+    updateSurveyProgress();
+  });
+});
+
+function buildEntryFromForm(){
+  return {
+    nnId: document.getElementById('fb-nn').value,
+    date: document.getElementById('fb-date').value,
+    attendance: Number(document.getElementById('fb-attendance').value) || null,
+    avgAge: Number(document.getElementById('fb-avgage').value) || null,
+    coVisitors: coVisitorsDraft.map(c=>({...c})),
+    ratings: {...ratings},
+    status: selectedStatus,
+    notes: document.getElementById('fb-notes').value.trim()
+  };
+}
+
+function resetFeedbackForm(){
+  document.getElementById('feedback-form').reset();
+  ratings = {food:0, leadership:0, halaqah:0};
+  selectedStatus = null;
+  coVisitorsDraft = [];
+  editingEntryId = null;
+  document.querySelectorAll('.status-opt').forEach(o=>o.classList.remove('sel-ok','sel-warn','sel-urgent'));
+  document.getElementById('editing-banner').classList.add('hidden');
+  document.getElementById('duplicate-banner-holder').innerHTML = '';
+  document.getElementById('fb-submit-btn').textContent = 'Submit feedback';
+  renderFeedbackForm();
+}
+
+document.getElementById('cancel-edit-btn').addEventListener('click', resetFeedbackForm);
+
+async function finalizeSubmit(draft){
+  draft.coVisitors.forEach(c=>ensureMember(c.name));
+  if(editingEntryId){
+    const entry = state.feedback.find(f=>f.id===editingEntryId);
+    Object.assign(entry, draft);
+    await saveState();
+    showToast('Submission updated');
+  }else{
+    state.feedback.push({ id: uid(), submittedBy: currentUser.name, feedbackSent:false, ...draft });
+    await saveState();
+    showToast('Feedback submitted');
+  }
+  resetFeedbackForm();
+  renderDashboard();
+  renderNeighbornetsTab();
+  renderTeamTab();
+  renderMapTab();
+}
+
+async function mergeIntoExisting(existingId, draft){
+  const entry = state.feedback.find(f=>f.id===existingId);
+  entry.coVisitors = entry.coVisitors || [];
+  if(!entry.coVisitors.find(c=>c.name.toLowerCase()===currentUser.name.toLowerCase()) && entry.submittedBy.toLowerCase()!==currentUser.name.toLowerCase()){
+    entry.coVisitors.push({ name: currentUser.name, linked:true });
+  }
+  draft.coVisitors.forEach(c=>{
+    ensureMember(c.name);
+    if(!entry.coVisitors.find(x=>x.name.toLowerCase()===c.name.toLowerCase()) && entry.submittedBy.toLowerCase()!==c.name.toLowerCase()){
+      entry.coVisitors.push({ name: c.name, linked:false });
+    }
+  });
+  if(draft.notes){
+    entry.notes = entry.notes + `\n\n— Added by ${currentUser.name}: ${draft.notes}`;
+  }
+  await saveState();
+  showToast('Linked to the existing visit');
+  resetFeedbackForm();
+  renderDashboard();
+  renderNeighbornetsTab();
+  renderTeamTab();
+  renderMapTab();
+}
+
+function showDuplicateChoice(existing, draft){
+  const nn = state.neighbornets.find(n=>n.id===draft.nnId);
+  const holder = document.getElementById('duplicate-banner-holder');
+  holder.innerHTML = `
+    <div class="duplicate-banner">
+      <div class="dup-title">A visit already exists for this date</div>
+      <div class="dup-desc">${existing.submittedBy} already logged a visit to ${nn ? nn.name : 'this neighbornet'} on ${draft.date}. Link yours to it instead of counting a separate visit?</div>
+      <div class="dup-actions">
+        <button type="button" class="btn btn-primary btn-small" id="dup-link-btn" style="width:auto;">Link my visit</button>
+        <button type="button" class="btn btn-secondary btn-small" id="dup-separate-btn">Submit as separate visit</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('dup-link-btn').addEventListener('click', ()=>{
+    mergeIntoExisting(existing.id, draft);
+  });
+  document.getElementById('dup-separate-btn').addEventListener('click', ()=>{
+    finalizeSubmit(draft);
+  });
+}
+
+document.getElementById('feedback-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const draft = buildEntryFromForm();
+  if(!draft.notes){ showToast('The feedback paragraph is required to submit.'); return; }
+  document.getElementById('duplicate-banner-holder').innerHTML = '';
+  if(!editingEntryId){
+    const dup = state.feedback.find(f=>f.nnId===draft.nnId && f.date===draft.date && f.submittedBy.toLowerCase()!==currentUser.name.toLowerCase() && !(f.coVisitors||[]).some(c=>c.name.toLowerCase()===currentUser.name.toLowerCase()));
+    if(dup){ showDuplicateChoice(dup, draft); return; }
+  }
+  finalizeSubmit(draft);
+});
+
+function renderMySubmissions(){
+  const holder = document.getElementById('my-submissions');
+  if(!currentUser){ holder.innerHTML=''; return; }
+  const mine = state.feedback.filter(f=>f.submittedBy.toLowerCase()===currentUser.name.toLowerCase()).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!mine.length){
+    holder.innerHTML = '<div class="empty-state"><strong>Nothing yet</strong>Submissions you make will show up here for editing.</div>';
+    return;
+  }
+  holder.innerHTML = mine.map(v=>{
+    const n = state.neighbornets.find(x=>x.id===v.nnId);
+    return `<div class="visit-row" style="grid-template-columns:90px 1fr 90px;">
+      <div class="visit-date">${v.date}</div>
+      <div><div class="visit-nn">${n ? n.name : 'Unknown'}</div><span class="badge ${statusMeta(v.status).cls}">${statusMeta(v.status).label}</span></div>
+      <div style="text-align:right;"><button class="btn btn-secondary btn-small" data-edit-entry="${v.id}">Edit</button></div>
+    </div>`;
+  }).join('');
+  holder.querySelectorAll('[data-edit-entry]').forEach(btn=>{
+    btn.addEventListener('click', ()=>loadEntryForEdit(btn.dataset.editEntry));
+  });
+}
+
+function loadEntryForEdit(entryId){
+  const entry = state.feedback.find(f=>f.id===entryId);
+  if(!entry) return;
+  editingEntryId = entryId;
+  document.getElementById('fb-nn').value = entry.nnId;
+  document.getElementById('fb-date').valueAsDate = new Date(entry.date + 'T00:00:00');
+  document.getElementById('fb-attendance').value = entry.attendance || '';
+  document.getElementById('fb-avgage').value = entry.avgAge || '';
+  document.getElementById('fb-notes').value = entry.notes || '';
+  ratings = { ...entry.ratings };
+  selectedStatus = entry.status || null;
+  coVisitorsDraft = (entry.coVisitors||[]).map(c=>({...c}));
+  document.querySelectorAll('.status-opt').forEach(o=>{
+    o.classList.remove('sel-ok','sel-warn','sel-urgent');
+    if(o.dataset.status===selectedStatus) o.classList.add('sel-'+selectedStatus);
+  });
+  renderStars();
+  renderCoVisitorChips();
+  updateSurveyProgress();
+  const nn = state.neighbornets.find(n=>n.id===entry.nnId);
+  document.getElementById('editing-banner-text').textContent = `Editing your submission for ${nn ? nn.name : 'this neighbornet'} on ${entry.date}`;
+  document.getElementById('editing-banner').classList.remove('hidden');
+  document.getElementById('fb-submit-btn').textContent = 'Save changes';
+  document.getElementById('tab-feedback').scrollIntoView({behavior:'smooth'});
+}
+
+/* ---------------- neighbornets tab ---------------- */
+document.getElementById('add-nn-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!currentUser || currentUser.role !== 'admin'){ showToast('Only admins can add neighbornets.'); return; }
+  const name = document.getElementById('new-nn-name').value.trim();
+  const city = document.getElementById('new-nn-city').value.trim();
+  const region = document.getElementById('new-nn-region').value.trim();
+  const area = document.getElementById('new-nn-area').value.trim();
+  const stateAbbr = document.getElementById('new-nn-state').value.trim().toUpperCase();
+  const lat = document.getElementById('new-nn-lat').value.trim();
+  const lng = document.getElementById('new-nn-lng').value.trim();
+  const contactEmail = document.getElementById('new-nn-email').value.trim();
+  const instagram = document.getElementById('new-nn-ig').value.trim();
+  if(!name || !region || !area) return;
+  const nn = { id: uid(), name, city, region, area, contactEmail, instagram, state: stateAbbr || null, lat: lat ? Number(lat) : null, lng: lng ? Number(lng) : null };
+  state.neighbornets.push(nn);
+  await saveState();
+  showToast('Neighbornet added');
+  e.target.reset();
+  selectedNnId = nn.id;
+  renderAll();
+});
+
+async function toggleFeedbackSent(entryId){
+  const entry = state.feedback.find(f=>f.id===entryId);
+  if(!entry) return;
+  entry.feedbackSent = !entry.feedbackSent;
+  await saveState();
+  renderNeighbornetsTab();
+  renderTeamTab();
+}
+
+function renderNeighbornetsTab(){
+  const regionList = document.getElementById('region-list');
+  const areaList = document.getElementById('area-list');
+  regionList.innerHTML = [...new Set(state.neighbornets.map(n=>n.region).filter(Boolean))].map(r=>`<option value="${r}">`).join('');
+  areaList.innerHTML = [...new Set(state.neighbornets.map(n=>n.area).filter(Boolean))].map(a=>`<option value="${a}">`).join('');
+
+  const list = document.getElementById('nn-select-list');
+  if(!state.neighbornets.length){
+    list.innerHTML = '<div class="empty-state"><strong>Nothing here yet</strong>An admin needs to add the first neighbornet.</div>';
+    document.getElementById('nn-detail').innerHTML = '<div class="empty-state"><strong>No neighbornet selected</strong>Pick one from the list to see its history.</div>';
+    return;
+  }
+  if(!selectedNnId) selectedNnId = state.neighbornets[0].id;
+
+  list.innerHTML = state.neighbornets.map(n=>`
+    <div class="nn-select-item ${n.id===selectedNnId?'active':''}" data-id="${n.id}">
+      <div class="nsi-name">${n.name}</div>
+      <div class="nsi-city">${n.area || ''}</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('.nn-select-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      selectedNnId = item.dataset.id;
+      renderNeighbornetsTab();
+      showMobileDetail('nn-list-card','nn-detail');
+    });
+  });
+
+  renderNnDetail(selectedNnId);
+}
+
+function renderNnDetail(nnId){
+  const n = state.neighbornets.find(x=>x.id===nnId);
+  const detail = document.getElementById('nn-detail');
+  if(!n){ detail.innerHTML = ''; return; }
+  const visits = state.feedback.filter(f=>f.nnId===nnId).sort((a,b)=>a.date.localeCompare(b.date));
+  const partner = state.partners[nnId];
+  const partnerLabel = partner && partner.members && partner.members.length ? partner.members.join(', ') : 'Unassigned';
+
+  let chartHtml = '';
+  if(visits.length){
+    const max = Math.max(...visits.map(v=>Number(v.attendance||0)), 1);
+    const recent = visits.slice(-8);
+    chartHtml = `
+      <div class="bar-chart">${recent.map(v=>`<div class="bar" style="height:${Math.max(4,(v.attendance/max)*80)}px" title="${v.date}: ${v.attendance||0}"></div>`).join('')}</div>
+      <div class="bar-labels">${recent.map(v=>`<span>${v.date.slice(5)}</span>`).join('')}</div>
+    `;
+  }
+
+  let tableHtml = '';
+  if(visits.length){
+    tableHtml = `<div class="table-mobile-cards"><table>
+      <thead><tr><th>Date</th><th>Visited by</th><th>Attendance</th><th>Status</th><th>Feedback sent</th><th>Notes</th></tr></thead>
+      <tbody>
+        ${[...visits].reverse().map(v=>`<tr>
+          <td class="cell-mono" data-label="Date">${v.date}</td>
+          <td data-label="Visited by">${visitedByLabel(v)}</td>
+          <td class="cell-mono" data-label="Attendance">${v.attendance || '—'}</td>
+          <td data-label="Status"><span class="badge ${statusMeta(v.status).cls}">${statusMeta(v.status).label}</span></td>
+          <td data-label="Feedback sent"><button class="btn-toggle ${v.feedbackSent?'on':''}" data-toggle-sent="${v.id}">${v.feedbackSent?'Sent':'Not sent'}</button></td>
+          <td data-label="Notes">${v.notes ? v.notes : '<span style="color:var(--text-muted)">—</span>'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
+  const contactLine = (n.contactEmail || n.instagram) ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">${n.contactEmail || ''}${n.contactEmail && n.instagram ? ' &middot; ' : ''}${n.instagram || ''}</div>` : '';
+
+  detail.innerHTML = `
+    <button type="button" class="mobile-back-btn show-mobile" id="nn-detail-back">&larr; Back to list</button>
+    <div class="section-label">
+      <span>${n.name}${n.area ? ' — '+n.area : ''}</span>
+      <span class="badge badge-neutral">Partners: ${partnerLabel}</span>
+    </div>
+    ${contactLine}
+    ${visits.length ? `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Attendance trend</div>
+        ${chartHtml}
+      </div>
+      ${tableHtml}
+    ` : `<div class="empty-state"><strong>No visits logged for this neighbornet</strong>Submit a QC feedback entry to start tracking it.</div>`}
+  `;
+  document.getElementById('nn-detail-back').addEventListener('click', ()=>showMobileList('nn-list-card','nn-detail'));
+  detail.querySelectorAll('[data-toggle-sent]').forEach(btn=>{
+    btn.addEventListener('click', ()=>toggleFeedbackSent(btn.dataset.toggleSent));
+  });
+}
+
+/* ---------------- network map tab ---------------- */
+const STATE_NAMES = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',
+  FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',
+  LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',
+  MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',
+  NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',
+  RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',
+  VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
+};
+let currentMapStateByPrefix = {};
+let usAtlasCache = null;
+
+async function loadUsAtlas(){
+  if(usAtlasCache) return usAtlasCache;
+  const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json');
+  usAtlasCache = await res.json();
+  return usAtlasCache;
+}
+
+function renderRegionFallback(list){
+  const regions = {};
+  list.forEach(n=>{
+    const r = n.region || 'Unassigned region';
+    const a = n.area || 'Unassigned area';
+    regions[r] = regions[r] || {};
+    regions[r][a] = regions[r][a] || [];
+    regions[r][a].push(n);
+  });
+  return Object.keys(regions).sort().map(regionName=>{
+    const areas = regions[regionName];
+    const count = Object.values(areas).reduce((s,arr)=>s+arr.length,0);
+    const areaHtml = Object.keys(areas).sort().map(areaName=>{
+      const pins = areas[areaName].map(n=>{
+        const lv = latestVisitFor(n.id);
+        const color = ragColor(lv ? lv.status : null);
+        return `<div class="nn-pin" data-goto-nn="${n.id}"><span class="nn-pin-dot" style="background:${color};box-shadow:0 0 6px ${color};"></span>${n.name}</div>`;
+      }).join('');
+      return `<div class="area-block"><div class="area-title">${areaName}</div><div class="nn-pin-wrap">${pins}</div></div>`;
+    }).join('');
+    return `<div class="region-card">
+      <div class="region-title">${regionName} <span class="region-count">${count} neighbornet${count===1?'':'s'}</span></div>
+      ${areaHtml}
+    </div>`;
+  }).join('');
+}
+
+function wireGotoNn(holder){
+  holder.querySelectorAll('[data-goto-nn]').forEach(pin=>{
+    pin.addEventListener('click', ()=>{
+      selectedNnId = pin.dataset.gotoNn;
+      document.querySelector('.nav-item[data-tab="neighbornets"]').click();
+    });
+  });
+}
+
+function mapDetailHtml(n){
+  const lv = latestVisitFor(n.id);
+  const meta = lv ? statusMeta(lv.status) : {label:'No visits yet', cls:'badge-neutral'};
+  const partner = state.partners[n.id];
+  const partnerLabel = partner && partner.members && partner.members.length ? partner.members.join(', ') : 'Unassigned';
+  return `
+    <div style="font-family:var(--font-display);font-weight:700;font-size:15px;color:#F5F3FF;margin-bottom:2px;">${n.name}</div>
+    <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">${n.area || ''}</div>
+    <div style="margin-bottom:10px;"><span class="badge ${meta.cls}">${meta.label}</span></div>
+    <div style="font-size:12.5px;margin-bottom:6px;"><strong>Last visit:</strong> ${lv ? lv.date : '—'}</div>
+    <div style="font-size:12.5px;margin-bottom:6px;"><strong>Partners:</strong> ${partnerLabel}</div>
+    ${n.contactEmail ? `<div style="font-size:11.5px;margin-bottom:4px;word-break:break-all;color:var(--text-muted);">${n.contactEmail}</div>` : ''}
+    ${n.instagram ? `<div style="font-size:11.5px;margin-bottom:4px;color:var(--text-muted);">${n.instagram}</div>` : ''}
+    <button type="button" class="btn btn-secondary btn-small" data-goto-nn="${n.id}" style="margin-top:8px;width:auto;">Open full details</button>
+  `;
+}
+
+async function renderGeoMapWidget(rootId, prefix){
+  const root = document.getElementById(rootId);
+  if(!root) return;
+  const list = state.neighbornets;
+  if(!list.length){
+    root.innerHTML = '<div class="empty-state"><strong>No neighbornets yet</strong>They will appear here once added.</div>';
+    return;
+  }
+
+  const hasCoords = n => n.lat!=null && n.lng!=null && n.lat!=='' && n.lng!=='' && !isNaN(Number(n.lat)) && !isNaN(Number(n.lng));
+  const withCoords = list.filter(hasCoords);
+  const missing = list.filter(n=>!hasCoords(n));
+
+  if(!withCoords.length){
+    root.innerHTML = `<div class="empty-state" style="margin-bottom:16px;"><strong>No coordinates yet</strong>Add latitude/longitude when creating a neighbornet to see the real map. Showing the region view instead.</div>${renderRegionFallback(list)}`;
+    wireGotoNn(root);
+    return;
+  }
+
+  const statesPresent = [...new Set(withCoords.map(n=>(n.state||'NJ').toUpperCase()))].sort();
+  if(!currentMapStateByPrefix[prefix] || !statesPresent.includes(currentMapStateByPrefix[prefix])) currentMapStateByPrefix[prefix] = statesPresent[0];
+  const selectedState = currentMapStateByPrefix[prefix];
+
+  root.innerHTML = `
+    <div class="map-state-bar">
+      <label style="font-size:12.5px;font-weight:600;">State</label>
+      <select id="${prefix}-map-state-select">${statesPresent.map(s=>`<option value="${s}" ${s===selectedState?'selected':''}>${STATE_NAMES[s]||s}</option>`).join('')}</select>
+    </div>
+    <div class="geo-map-layout">
+      <div class="geo-map-main">
+        <div class="geo-map-card">
+          <div id="${prefix}-geo-map-svg-holder" class="geo-empty">Loading map…</div>
+        </div>
+        <div class="map-note" id="${prefix}-map-missing-note" style="margin-top:10px;"></div>
+      </div>
+      <div class="geo-map-side" id="${prefix}-map-detail-panel">
+        <div class="empty-state" style="padding:16px 6px;"><strong>Tap a pin</strong>See quick details for a neighbornet here.</div>
+      </div>
+    </div>
+    <div class="sheet-backdrop" id="${prefix}-map-sheet-backdrop"></div>
+  `;
+  document.getElementById(`${prefix}-map-sheet-backdrop`).addEventListener('click', ()=>closeMapSheetFor(prefix));
+  document.getElementById(`${prefix}-map-state-select`).addEventListener('change', (e)=>{
+    currentMapStateByPrefix[prefix] = e.target.value;
+    renderGeoMapWidget(rootId, prefix);
+  });
+  document.getElementById(`${prefix}-map-missing-note`).innerHTML = missing.length
+    ? `Not shown on the map yet (missing coordinates): ${missing.map(n=>n.name).join(', ')}`
+    : '';
+
+  try{
+    const topo = await loadUsAtlas();
+    const statesGeo = topojson.feature(topo, topo.objects.states);
+    const fullName = STATE_NAMES[selectedState] || selectedState;
+    const feature = statesGeo.features.find(f=>f.properties.name === fullName);
+    if(!feature){
+      document.getElementById(`${prefix}-geo-map-svg-holder`).innerHTML = `<div class="empty-state"><strong>Could not find "${fullName}"</strong>Double check the state field on that neighbornet.</div>`;
+      return;
+    }
+    drawGeoMap(feature, withCoords.filter(n=>(n.state||'NJ').toUpperCase()===selectedState), prefix);
+  }catch(err){
+    console.error(err);
+    document.getElementById(`${prefix}-geo-map-svg-holder`).innerHTML = '<div class="empty-state"><strong>Could not load map data</strong>Check your connection and try again.</div>';
+  }
+}
+
+async function renderMapTab(){
+  renderGeoMapWidget('map-regions', 'maptab');
+}
+
+function drawGeoMap(feature, points, prefix){
+  const width = 900, height = 700;
+  const projection = d3.geoMercator().fitExtent([[70,40],[width-70,height-40]], feature);
+  const pathGen = d3.geoPath(projection);
+  const dAttr = pathGen(feature);
+  const bounds = pathGen.bounds(feature);
+  const centerX = (bounds[0][0] + bounds[1][0]) / 2;
+
+  const projected = points.map(n=>{
+    const xy = projection([Number(n.lng), Number(n.lat)]);
+    return xy ? { ...n, x: xy[0], y: xy[1] } : null;
+  }).filter(Boolean);
+
+  const left = projected.filter(p=>p.x < centerX).sort((a,b)=>a.y-b.y);
+  const right = projected.filter(p=>p.x >= centerX).sort((a,b)=>a.y-b.y);
+  const topPad = 46, spacing = 40;
+
+  function layout(arr, side){
+    return arr.map((p,i)=>({ ...p, labelY: topPad + i*spacing, labelX: side==='left' ? 34 : width-34, side }));
+  }
+  const allLabeled = [...layout(left,'left'), ...layout(right,'right')];
+
+  const linesHtml = allLabeled.map(p=>{
+    const bendX = p.side==='left' ? Math.max(p.x - 70, p.labelX + 90) : Math.min(p.x + 70, p.labelX - 90);
+    return `<path d="M ${p.x} ${p.y} L ${bendX} ${p.labelY} L ${p.labelX} ${p.labelY}" fill="none" stroke="#C9A227" stroke-width="1.2" opacity="0.65"/>`;
+  }).join('');
+
+  const dotsHtml = allLabeled.map(p=>{
+    const lv = latestVisitFor(p.id);
+    const c = ragColor(lv ? lv.status : null);
+    return `<g data-nn="${p.id}" class="map-pin-hit" style="cursor:pointer;">
+      <circle cx="${p.x}" cy="${p.y}" r="10" fill="${c}" opacity="0.22"/>
+      <circle cx="${p.x}" cy="${p.y}" r="5" fill="${c}" stroke="#170F32" stroke-width="1.5" style="filter:drop-shadow(0 0 6px ${c});"/>
+    </g>`;
+  }).join('');
+
+  const labelsHtml = allLabeled.map(p=>{
+    const anchor = p.side==='left' ? 'start' : 'end';
+    return `<text x="${p.labelX}" y="${p.labelY+4}" text-anchor="${anchor}" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600" fill="#F5F3FF" style="cursor:pointer;" data-nn="${p.id}" class="map-pin-hit">${p.name}</text>`;
+  }).join('');
+
+  const svg = `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block;">
+      <defs>
+        <filter id="stateGlow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <path d="${dAttr}" fill="rgba(139,92,246,0.10)" stroke="#8B5CF6" stroke-width="2.2" filter="url(#stateGlow)"/>
+      ${linesHtml}
+      ${dotsHtml}
+      ${labelsHtml}
+    </svg>
+  `;
+  const svgHolder = document.getElementById(`${prefix}-geo-map-svg-holder`);
+  svgHolder.classList.remove('geo-empty');
+  svgHolder.innerHTML = svg;
+
+  const detailPanel = document.getElementById(`${prefix}-map-detail-panel`);
+  const nnById = {};
+  allLabeled.forEach(p=>{ nnById[p.id] = p; });
+  svgHolder.querySelectorAll('[data-nn]').forEach(el=>{
+    const nn = nnById[el.dataset.nn];
+    if(!nn) return;
+    el.addEventListener('mouseenter', ()=>{ detailPanel.innerHTML = `<div class="sheet-grabber"></div>` + mapDetailHtml(nn); });
+    el.addEventListener('click', ()=>{
+      detailPanel.innerHTML = `<div class="sheet-grabber" id="${prefix}-sheet-grabber"></div>` + mapDetailHtml(nn);
+      document.getElementById(`${prefix}-sheet-grabber`).addEventListener('click', ()=>closeMapSheetFor(prefix));
+      if(isNarrow(760)){
+        detailPanel.classList.add('sheet-open');
+        document.getElementById(`${prefix}-map-sheet-backdrop`).classList.add('show');
+      }
+    });
+  });
+  detailPanel.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-goto-nn]');
+    if(!btn) return;
+    closeMapSheetFor(prefix);
+    switchTab('neighbornets');
+    selectedNnId = btn.dataset.gotoNn;
+    renderNeighbornetsTab();
+    showMobileDetail('nn-list-card','nn-detail');
+  });
+}
+
+/* ---------------- cloud team tab ---------------- */
+function memberStats(member){
+  const entries = state.feedback.filter(f=>f.submittedBy.toLowerCase()===member.name.toLowerCase() || (f.coVisitors||[]).some(c=>c.name.toLowerCase()===member.name.toLowerCase()));
+  const distinctNn = new Set(entries.map(e=>e.nnId)).size;
+  const pending = entries.filter(e=>!e.feedbackSent).length;
+  const latest = entries.length ? [...entries].sort((a,b)=>b.date.localeCompare(a.date))[0] : null;
+  return { entries, distinctNn, pending, latest };
+}
+
+function formFilledFor(entry, memberName){
+  if(entry.submittedBy.toLowerCase()===memberName.toLowerCase()) return true;
+  const cv = (entry.coVisitors||[]).find(c=>c.name.toLowerCase()===memberName.toLowerCase());
+  return !!(cv && cv.linked);
+}
+
+function renderTeamTab(){
+  const grid = document.getElementById('team-stat-grid');
+  const totalVisits = displayedVisitTotal();
+  const approvedMembers = state.members.length;
+  const avgPerMember = approvedMembers ? Math.round(totalVisits/approvedMembers*10)/10 : 0;
+  const pendingTotal = state.feedback.filter(f=>!f.feedbackSent).length;
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Cloud members</div><div class="stat-value">${approvedMembers}</div></div>
+    <div class="stat-card"><div class="stat-label">Total visits</div><div class="stat-value">${totalVisits}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg visits / member</div><div class="stat-value">${avgPerMember}</div></div>
+    <div class="stat-card"><div class="stat-label">Feedback not sent yet</div><div class="stat-value">${pendingTotal}</div></div>
+  `;
+
+  const list = document.getElementById('member-select-list');
+  if(!state.members.length){
+    list.innerHTML = '<div class="empty-state"><strong>No Cloud members yet</strong>Members are added automatically once an admin approves their account.</div>';
+    document.getElementById('member-detail').innerHTML = '<div class="empty-state"><strong>No member selected</strong>Pick someone from the list to see their visit history.</div>';
+    return;
+  }
+  if(!selectedMemberId || !state.members.find(m=>m.id===selectedMemberId)) selectedMemberId = state.members[0].id;
+
+  list.innerHTML = state.members.map(m=>{
+    const s = memberStats(m);
+    return `<div class="nn-select-item ${m.id===selectedMemberId?'active':''}" data-id="${m.id}">
+      <div class="member-select-item">
+        <div class="avatar-circle">${initials(m.name)}</div>
+        <div><div class="nsi-name">${m.name}</div><div class="nsi-city">${s.distinctNn} neighbornet${s.distinctNn===1?'':'s'} &middot; ${s.entries.length} visit${s.entries.length===1?'':'s'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.nn-select-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      selectedMemberId = item.dataset.id;
+      renderTeamTab();
+      showMobileDetail('member-list-card','member-detail');
+    });
+  });
+
+  renderMemberDetail(selectedMemberId);
+}
+
+function renderMemberDetail(memberId){
+  const m = state.members.find(x=>x.id===memberId);
+  const detail = document.getElementById('member-detail');
+  if(!m){ detail.innerHTML = ''; return; }
+  const s = memberStats(m);
+
+  let tableHtml = '';
+  if(s.entries.length){
+    tableHtml = `<div class="table-mobile-cards"><table>
+      <thead><tr><th>Neighbornet</th><th>Visit date</th><th>Form filled</th><th>Feedback sent</th></tr></thead>
+      <tbody>
+        ${[...s.entries].sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{
+          const n = state.neighbornets.find(x=>x.id===v.nnId);
+          return `<tr>
+            <td data-label="Neighbornet">${n ? n.name : 'Unknown'}</td>
+            <td class="cell-mono" data-label="Visit date">${v.date}</td>
+            <td data-label="Form filled"><span class="badge ${formFilledFor(v,m.name)?'badge-success':'badge-neutral'}">${formFilledFor(v,m.name)?'Yes':'Via teammate'}</span></td>
+            <td data-label="Feedback sent"><button class="btn-toggle ${v.feedbackSent?'on':''}" data-toggle-sent="${v.id}">${v.feedbackSent?'Sent':'Not sent'}</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
+  detail.innerHTML = `
+    <button type="button" class="mobile-back-btn show-mobile" id="member-detail-back">&larr; Back to list</button>
+    <div class="section-label">
+      <span style="display:flex;align-items:center;gap:10px;"><span class="avatar-circle">${initials(m.name)}</span>${m.name}</span>
+      <span class="badge badge-neutral">${s.pending} pending</span>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-label">Neighbornets visited</div><div class="stat-value">${s.distinctNn}</div></div>
+      <div class="stat-card"><div class="stat-label">Total visits</div><div class="stat-value">${s.entries.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Last visit</div><div class="stat-value" style="font-size:16px;">${s.latest ? s.latest.date : '—'}</div></div>
+    </div>
+    ${s.entries.length ? tableHtml : `<div class="empty-state"><strong>No visits logged yet</strong>Once ${m.name} is part of a visit, it will show up here.</div>`}
+  `;
+  document.getElementById('member-detail-back').addEventListener('click', ()=>showMobileList('member-list-card','member-detail'));
+  detail.querySelectorAll('[data-toggle-sent]').forEach(btn=>{
+    btn.addEventListener('click', ()=>toggleFeedbackSent(btn.dataset.toggleSent));
+  });
+}
+
+/* ---------------- rotation tab ---------------- */
+async function addRotationMember(nnId, name){
+  if(!name) return;
+  ensureMember(name);
+  state.partners[nnId] = state.partners[nnId] || { members: [], since: new Date().toISOString().slice(0,10) };
+  if(!state.partners[nnId].members.includes(name)){
+    state.partners[nnId].members.push(name);
+    if(state.partners[nnId].members.length===1) state.partners[nnId].since = new Date().toISOString().slice(0,10);
+    state.rotationHistory.push({ id: uid(), nnId, members:[...state.partners[nnId].members], date: new Date().toISOString().slice(0,10) });
+    await saveState();
+    showToast('Added to pairing');
+    renderRotationTab();
+    renderDashboard();
+    renderTeamTab();
+  }
+}
+async function removeRotationMember(nnId, name){
+  const p = state.partners[nnId];
+  if(!p) return;
+  p.members = p.members.filter(m=>m!==name);
+  if(!p.members.length) delete state.partners[nnId];
+  await saveState();
+  renderRotationTab();
+  renderDashboard();
+  renderTeamTab();
+}
+
+function renderRotationTab(){
+  const empty = document.getElementById('rotation-empty');
+  const list = document.getElementById('rotation-list');
+  if(!state.neighbornets.length){
+    empty.classList.remove('hidden');
+    list.innerHTML = '';
+    document.getElementById('rotation-history').innerHTML = '';
+    return;
+  }
+  empty.classList.add('hidden');
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  list.innerHTML = state.neighbornets.map(n=>{
+    const p = state.partners[n.id];
+    const members = p && p.members ? p.members : [];
+    const chips = members.map(name=>{
+      const canRemove = isAdmin || (currentUser && name.toLowerCase()===currentUser.name.toLowerCase());
+      return `<span class="chip">${name}${canRemove ? `<button type="button" class="chip-remove" data-remove-partner="${n.id}::${name}">&times;</button>` : ''}</span>`;
+    }).join('');
+    const alreadyIn = currentUser && members.some(m=>m.toLowerCase()===currentUser.name.toLowerCase());
+    const controls = isAdmin
+      ? `<input type="text" class="rotation-add-input" data-nn="${n.id}" list="member-list" placeholder="Add a Cloud member">
+         <button type="button" class="btn btn-secondary btn-small rotation-add-btn" data-nn="${n.id}" style="flex-shrink:0;">Add</button>`
+      : (alreadyIn
+          ? `<button type="button" class="btn btn-secondary btn-small rotation-leave-btn" data-nn="${n.id}">Leave this pairing</button>`
+          : `<button type="button" class="btn btn-primary btn-small rotation-join-btn" data-nn="${n.id}" style="width:auto;">Join this pairing</button>`);
+    return `<div class="card" style="margin-bottom:12px;">
+      <div class="section-label"><span>${n.name}<span style="color:var(--text-muted);font-weight:400;font-size:12px;"> — ${n.area||''}</span></span><span class="badge badge-neutral">${p ? 'since '+p.since : 'unassigned'}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${chips || '<span style="color:var(--text-muted);font-size:12.5px;">No one paired yet</span>'}</div>
+      <div style="display:flex;gap:8px;">${controls}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.rotation-add-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nnId = btn.dataset.nn;
+      const input = list.querySelector(`.rotation-add-input[data-nn="${nnId}"]`);
+      const name = input.value.trim();
+      if(!name){ showToast('Enter a name first'); return; }
+      addRotationMember(nnId, name);
+      input.value = '';
+    });
+  });
+  list.querySelectorAll('.rotation-join-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      addRotationMember(btn.dataset.nn, currentUser.name);
+    });
+  });
+  list.querySelectorAll('.rotation-leave-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      removeRotationMember(btn.dataset.nn, currentUser.name);
+    });
+  });
+  list.querySelectorAll('[data-remove-partner]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [nnId, name] = btn.dataset.removePartner.split('::');
+      removeRotationMember(nnId, name);
+    });
+  });
+
+  const historyHolder = document.getElementById('rotation-history');
+  const hist = [...state.rotationHistory].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+  if(!hist.length){
+    historyHolder.innerHTML = '<div class="empty-state"><strong>No assignments yet</strong>Pair someone above to start a history.</div>';
+  }else{
+    historyHolder.innerHTML = hist.map(h=>{
+      const n = state.neighbornets.find(x=>x.id===h.nnId);
+      return `<div class="visit-row" style="grid-template-columns:90px 1fr 1fr;">
+        <div class="visit-date">${h.date}</div>
+        <div class="visit-nn">${n ? n.name : 'Unknown'}</div>
+        <div>${(h.members||[]).join(', ')}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+/* ---------------- admin tab ---------------- */
+async function setUserStatus(userId, status){
+  const u = state.users.find(x=>x.id===userId);
+  if(!u) return;
+  u.status = status;
+  if(status==='approved') ensureMember(u.name);
+  await saveState();
+  renderAdminTab();
+  renderTeamTab();
+  updateAdminBadge();
+  showToast(status==='approved' ? 'User approved' : 'User rejected');
+}
+
+async function toggleUserRole(userId){
+  const u = state.users.find(x=>x.id===userId);
+  if(!u) return;
+  u.role = u.role === 'admin' ? 'user' : 'admin';
+  await saveState();
+  renderAdminTab();
+  showToast(u.name + ' is now ' + u.role);
+}
+
+function updateAdminBadge(){
+  const pendingCount = state.users.filter(u=>u.status==='pending').length;
+  const tag = document.getElementById('admin-pending-tag');
+  tag.textContent = pendingCount > 0 ? pendingCount : '';
+  tag.classList.toggle('hidden', pendingCount === 0);
+}
+
+document.getElementById('admin-save-adjustments').addEventListener('click', async ()=>{
+  const offset = Number(document.getElementById('admin-visit-offset').value) || 0;
+  const goalVal = document.getElementById('admin-visit-goal').value;
+  state.dashboardAdjustments.manualOffset = offset;
+  state.dashboardAdjustments.goal = goalVal ? Number(goalVal) : null;
+  await saveState();
+  showToast('Dashboard adjustments saved');
+  renderDashboard();
+});
+
+function renderAdminTab(){
+  if(!currentUser || currentUser.role !== 'admin') return;
+  updateAdminBadge();
+  document.getElementById('admin-visit-offset').value = state.dashboardAdjustments.manualOffset || 0;
+  document.getElementById('admin-visit-goal').value = state.dashboardAdjustments.goal || '';
+
+  const pending = state.users.filter(u=>u.status==='pending');
+  const pendingHolder = document.getElementById('pending-users');
+  if(!pending.length){
+    pendingHolder.innerHTML = '<div class="empty-state"><strong>Nothing pending</strong>New sign-ups will show up here.</div>';
+  }else{
+    pendingHolder.innerHTML = pending.map(u=>`
+      <div class="user-row">
+        <div><strong>${u.name}</strong><div style="color:var(--text-muted);font-size:11.5px;">@${u.username}</div></div>
+        <div style="color:var(--text-muted);font-size:12px;">${u.method === 'google' ? 'Google (placeholder)' : 'Username / password'}</div>
+        <div></div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-small btn-approve" data-approve="${u.id}">Approve</button>
+          <button class="btn btn-small btn-reject" data-reject="${u.id}">Reject</button>
+        </div>
+      </div>
+    `).join('');
+    pendingHolder.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click', ()=>setUserStatus(b.dataset.approve,'approved')));
+    pendingHolder.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click', ()=>setUserStatus(b.dataset.reject,'rejected')));
+  }
+
+  const allHolder = document.getElementById('all-users');
+  allHolder.innerHTML = state.users.map(u=>`
+    <div class="user-row">
+      <div><strong>${u.name}</strong><div style="color:var(--text-muted);font-size:11.5px;">@${u.username}</div></div>
+      <div><span class="badge ${u.status==='approved'?'badge-success':u.status==='pending'?'badge-warn':'badge-urgent'}">${u.status}</span></div>
+      <div><span class="badge badge-neutral">${u.role}</span></div>
+      <div>${u.status==='approved' ? `<button class="btn btn-secondary btn-small" data-toggle-role="${u.id}">Make ${u.role==='admin'?'user':'admin'}</button>` : ''}</div>
+    </div>
+  `).join('');
+  allHolder.querySelectorAll('[data-toggle-role]').forEach(b=>b.addEventListener('click', ()=>toggleUserRole(b.dataset.toggleRole)));
+}
+
+/* ---------------- init ---------------- */
+loadState();
+</script>
+</body>
+</html>

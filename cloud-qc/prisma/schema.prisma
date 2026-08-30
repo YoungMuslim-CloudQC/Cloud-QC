@@ -1,0 +1,241 @@
+// Cloud QC — database schema
+// Rebuild of the cloud-qc prototype. See ../../cloud-qc (3).html for the original.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Supabase pooled connection (port 6543)
+  directUrl = env("DIRECT_URL") // Supabase direct/session connection (port 5432) — used for migrations
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VisitStatus {
+  ON_TRACK
+  NEEDS_FOLLOWUP
+  URGENT
+}
+
+enum ParticipantRole {
+  SUBMITTER
+  CO_VISITOR
+}
+
+// ---------------------------------------------------------------------------
+// Auth & people
+// Prototype had separate `users` and `members`; here an approved User *is* a
+// Cloud team member.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  passwordHash  String? // null for OAuth-only accounts
+  role          Role          @default(MEMBER)
+  status        AccountStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  accounts            Account[]
+  sessions            Session[]
+  submittedVisits     Visit[]              @relation("VisitSubmittedBy")
+  participations      VisitParticipant[]
+  comments            VisitComment[]
+  rotations           RotationAssignment[] @relation("RotationUser")
+  rotationsAssigned   RotationAssignment[] @relation("RotationAssignedBy")
+  neighbornetsCreated Neighbornet[]        @relation("NeighbornetCreatedBy")
+
+  @@index([status])
+}
+
+// Auth.js standard adapter model
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  refresh_token_expires_in Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// Auth.js standard adapter model — retained for adapter compatibility even
+// though the app uses the JWT session strategy (required to mix Credentials +
+// OAuth providers).
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Neighbornets
+// ---------------------------------------------------------------------------
+
+model Neighbornet {
+  id           String    @id @default(cuid())
+  name         String
+  city         String?
+  region       String
+  subArea      String
+  stateCode    String?   @db.Char(2)
+  latitude     Decimal?  @db.Decimal(9, 6)
+  longitude    Decimal?  @db.Decimal(9, 6)
+  contactEmail String?
+  instagram    String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdById String?
+  createdBy   User?   @relation("NeighbornetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  visits      Visit[]
+  rotations   RotationAssignment[]
+
+  @@index([stateCode])
+  @@index([region, subArea])
+}
+
+// ---------------------------------------------------------------------------
+// Visits (prototype: "feedback")
+// ---------------------------------------------------------------------------
+
+model Visit {
+  id               String       @id @default(cuid())
+  visitDate        DateTime     @db.Date
+  groupSize        Int? // prototype "average group size"
+  avgAge           Int?
+  foodRating       Int?         @db.SmallInt // 1–5
+  leadershipRating Int?         @db.SmallInt
+  halaqahRating    Int?         @db.SmallInt
+  status           VisitStatus?
+  notes            String // required
+  feedbackSent     Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  submittedById String
+  submittedBy   User   @relation("VisitSubmittedBy", fields: [submittedById], references: [id])
+
+  participants VisitParticipant[]
+  comments     VisitComment[]
+
+  @@index([neighbornetId, visitDate])
+  @@index([submittedById])
+}
+
+// Replaces the prototype's `submittedBy` string + `coVisitors` array.
+// Every visit gets one SUBMITTER row; co-visitors get CO_VISITOR rows.
+// "Visits logged" = count of these rows + app_settings.manual_visit_offset.
+model VisitParticipant {
+  id          String          @id @default(cuid())
+  role        ParticipantRole
+  contributed Boolean         @default(false) // prototype "linked": personally filled the form
+  createdAt   DateTime        @default(now())
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([visitId, userId])
+  @@index([userId])
+}
+
+// Replaces the prototype's practice of string-appending merged notes.
+model VisitComment {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@index([visitId])
+}
+
+// ---------------------------------------------------------------------------
+// Rotation (prototype: `partners` map + `rotationHistory` snapshots)
+// Current pairing = rows where endedOn IS NULL. History = all rows.
+// ---------------------------------------------------------------------------
+
+model RotationAssignment {
+  id        String    @id @default(cuid())
+  startedOn DateTime  @default(now()) @db.Date
+  endedOn   DateTime? @db.Date
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("RotationUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedById String?
+  assignedBy   User?   @relation("RotationAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([neighbornetId, endedOn])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// App settings — key/value singleton store
+// Keys: "manual_visit_offset" (number), "visit_goal" (number | null)
+// ---------------------------------------------------------------------------
+
+model AppSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}
