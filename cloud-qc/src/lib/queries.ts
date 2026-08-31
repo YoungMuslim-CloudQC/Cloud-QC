@@ -70,12 +70,99 @@ export async function getVisitWithHistory(id: string) {
   });
 }
 
+/** Resolve the `?from=` hint on /visits/[id] to a back-link target.
+ *  Falls back to the user's feedback history. */
+export async function resolveVisitBackTarget(
+  from: string | undefined,
+): Promise<{ href: string; label: string }> {
+  if (from?.startsWith("nn:")) {
+    const id = from.slice(3);
+    const nn = await db.neighbornet.findUnique({
+      where: { id },
+      select: { name: true },
+    });
+    if (nn) return { href: `/neighbornets/${id}`, label: nn.name };
+  }
+  if (from?.startsWith("member:")) {
+    const id = from.slice(7);
+    const u = await db.user.findUnique({
+      where: { id },
+      select: { name: true, email: true },
+    });
+    if (u) return { href: `/team/${id}`, label: memberName(u) };
+  }
+  if (from === "deleted") {
+    return { href: "/admin/deleted-visits", label: "Deleted visits" };
+  }
+  return { href: "/feedback", label: "your feedback" };
+}
+
 export async function getDeletedVisits() {
   return db.visit.findMany({
     where: { deletedAt: { not: null } },
     orderBy: { deletedAt: "desc" },
     include: VISIT_DETAIL_INCLUDE,
   });
+}
+
+export type PersonalDashboard = {
+  stats: {
+    totalVisits: number;
+    distinctNeighbornets: number;
+    pending: number;
+  };
+  recentVisits: {
+    id: string;
+    neighbornetName: string;
+    visitDate: Date;
+    status: string | null;
+  }[];
+  pairedNeighbornetIds: string[];
+};
+
+/** The signed-in user's own numbers for the dashboard "Yours" section. */
+export async function getPersonalDashboard(
+  userId: string,
+): Promise<PersonalDashboard> {
+  const [participations, rotations] = await Promise.all([
+    db.visitParticipant.findMany({
+      where: { userId, visit: { deletedAt: null } },
+      orderBy: { visit: { visitDate: "desc" } },
+      select: {
+        visit: {
+          select: {
+            id: true,
+            visitDate: true,
+            status: true,
+            feedbackSent: true,
+            neighbornetId: true,
+            neighbornet: { select: { name: true } },
+          },
+        },
+      },
+    }),
+    db.rotationAssignment.findMany({
+      where: { userId, endedOn: null },
+      select: { neighbornetId: true },
+    }),
+  ]);
+
+  const distinct = new Set(participations.map((p) => p.visit.neighbornetId));
+
+  return {
+    stats: {
+      totalVisits: participations.length,
+      distinctNeighbornets: distinct.size,
+      pending: participations.filter((p) => !p.visit.feedbackSent).length,
+    },
+    recentVisits: participations.slice(0, 5).map((p) => ({
+      id: p.visit.id,
+      neighbornetName: p.visit.neighbornet.name,
+      visitDate: p.visit.visitDate,
+      status: p.visit.status,
+    })),
+    pairedNeighbornetIds: rotations.map((r) => r.neighbornetId),
+  };
 }
 
 export type MemberStat = {

@@ -73,6 +73,6 @@ export function hysteresisStatus(
 }
 
 /** True when the displayed status warrants attention. */
-export function needsFollowup(status: VisitStatusValue | null): boolean {
+export function needsFollowup(status: string | null | undefined): boolean {
   return status === "NEEDS_FOLLOWUP" || status === "URGENT";
 }

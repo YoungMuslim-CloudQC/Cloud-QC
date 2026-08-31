@@ -44,7 +44,9 @@ export default async function DeletedVisitsPage() {
             <div className="card" key={v.id} style={{ marginBottom: 16 }}>
               <div className="section-label">
                 <span>
-                  <Link href={`/visits/${v.id}`}>{v.neighbornet.name}</Link>{" "}
+                  <Link href={`/visits/${v.id}?from=deleted`}>
+                    {v.neighbornet.name}
+                  </Link>{" "}
                   <span
                     style={{
                       color: "var(--text-muted)",

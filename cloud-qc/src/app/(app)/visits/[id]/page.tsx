@@ -2,10 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireApproved } from "@/lib/authz";
-import { getVisitWithHistory, memberName } from "@/lib/queries";
+import {
+  getVisitWithHistory,
+  memberName,
+  resolveVisitBackTarget,
+} from "@/lib/queries";
 import { isoDate, statusMeta } from "@/lib/format";
 import { type VisitSnapshot } from "@/lib/visit-history";
 import { PageHead } from "@/components/PageHead";
+import { BackLink } from "@/components/BackLink";
 import { VisitActions } from "@/components/visits/VisitActions";
 import {
   VisitHistoryTimeline,
@@ -20,12 +25,18 @@ function rating(n: number | null) {
 
 export default async function VisitDetailPage({
   params,
+  searchParams,
 }: PageProps<"/visits/[id]">) {
   const user = await requireApproved();
   const { id } = await params;
+  const { from } = await searchParams;
 
   const visit = await getVisitWithHistory(id);
   if (!visit) notFound();
+
+  const back = await resolveVisitBackTarget(
+    typeof from === "string" ? from : undefined,
+  );
 
   const canModify =
     visit.submittedById === user.id || user.role === "ADMIN";
@@ -45,6 +56,7 @@ export default async function VisitDetailPage({
 
   return (
     <>
+      <BackLink href={back.href} label={back.label} />
       <PageHead
         title="Visit"
         desc={

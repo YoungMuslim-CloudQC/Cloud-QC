@@ -1,5 +1,6 @@
 import { requireApproved } from "@/lib/authz";
 import { PageHead } from "@/components/PageHead";
+import { BackLink } from "@/components/BackLink";
 import { NeighbornetList } from "@/components/neighbornets/NeighbornetList";
 import { NeighbornetDetail } from "@/components/neighbornets/NeighbornetDetail";
 import { AddNeighbornetForm } from "@/components/neighbornets/AddNeighbornetForm";
@@ -15,6 +16,7 @@ export default async function NeighbornetPage({
 
   return (
     <>
+      <BackLink href="/neighbornets" label="Neighbornets" />
       <PageHead
         title="Neighbornets"
         desc="All local groups, their visit history, and attendance trend."

@@ -1,16 +1,24 @@
 import { db } from "@/lib/db";
-import { getSettings, memberName, getNeighbornetSummaries } from "@/lib/queries";
+import { requireApproved } from "@/lib/authz";
+import {
+  getSettings,
+  memberName,
+  getNeighbornetSummaries,
+  getPersonalDashboard,
+} from "@/lib/queries";
 import { needsFollowup as isFollowup } from "@/lib/neighbornet-status";
 import { isoDate, statusMeta } from "@/lib/format";
 import { PageHead } from "@/components/PageHead";
 import { Orbit } from "@/components/dashboard/Orbit";
 import { NeighbornetBoard } from "@/components/dashboard/NeighbornetBoard";
+import { YoursSection } from "@/components/dashboard/YoursSection";
 import type { MapNeighbornet } from "@/components/NetworkMap";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [summaries, settings, participantCount, visitAgg, recent] =
+  const user = await requireApproved();
+  const [summaries, settings, participantCount, visitAgg, recent, personal] =
     await Promise.all([
       getNeighbornetSummaries(),
       getSettings(),
@@ -33,7 +41,18 @@ export default async function DashboardPage() {
           },
         },
       }),
+      getPersonalDashboard(user.id),
     ]);
+
+  const pairedSet = new Set(personal.pairedNeighbornetIds);
+  const myPaired = summaries
+    .filter((s) => pairedSet.has(s.id))
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      subArea: s.subArea,
+      displayStatus: s.displayStatus,
+    }));
 
   const visitTotal = Math.max(0, participantCount + settings.manualOffset);
   const avgAttendance = visitAgg._count
@@ -101,6 +120,13 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      <YoursSection
+        stats={personal.stats}
+        recentVisits={personal.recentVisits}
+        pairedNeighbornets={myPaired}
+      />
+
+      <div className="section-label">Across all of Cloud</div>
       <div className="two-col">
         <div className="card">
           <div className="section-label">Network</div>

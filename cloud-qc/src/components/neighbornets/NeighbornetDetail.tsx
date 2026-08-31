@@ -153,7 +153,7 @@ export async function NeighbornetDetail({
                   return (
                     <tr key={v.id}>
                       <td className="cell-mono" data-label="Date">
-                        <Link href={`/visits/${v.id}`}>
+                        <Link href={`/visits/${v.id}?from=nn:${nn.id}`}>
                           {isoDate(v.visitDate)}
                         </Link>
                       </td>

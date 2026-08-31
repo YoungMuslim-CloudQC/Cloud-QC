@@ -82,7 +82,7 @@ export async function MemberDetail({ id }: { id: string }) {
                 return (
                   <tr key={p.id}>
                     <td data-label="Neighbornet">
-                      <Link href={`/visits/${p.visit.id}`}>
+                      <Link href={`/visits/${p.visit.id}?from=member:${id}`}>
                         {p.visit.neighbornet.name}
                       </Link>
                     </td>

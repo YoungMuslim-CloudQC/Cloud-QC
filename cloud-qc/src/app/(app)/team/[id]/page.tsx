@@ -1,6 +1,7 @@
 import { requireApproved } from "@/lib/authz";
 import { getTeamMemberStats } from "@/lib/queries";
 import { PageHead } from "@/components/PageHead";
+import { BackLink } from "@/components/BackLink";
 import { TeamStats } from "@/components/team/TeamStats";
 import { MemberList } from "@/components/team/MemberList";
 import { MemberDetail } from "@/components/team/MemberDetail";
@@ -16,6 +17,7 @@ export default async function TeamMemberPage({
 
   return (
     <>
+      <BackLink href="/team" label="Cloud Team" />
       <PageHead
         title="Cloud Team"
         desc="Every approved Cloud member and the status of their visits."
