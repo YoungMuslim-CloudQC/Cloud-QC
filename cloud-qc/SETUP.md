@@ -7,14 +7,20 @@ Stack: Next.js 16 (App Router) · Prisma 6 · Supabase Postgres · Auth.js v5
 
 ## What works right now
 
-- Prisma schema (`prisma/schema.prisma`) + seed (`prisma/seed.ts`)
-- Auth: signup (→ pending), login, Google OAuth (when configured), admin-approval gate
+- Prisma schema (`prisma/schema.prisma`) + seed (`prisma/seed.ts`), migrations applied
+- Auth: signup (→ pending), login, Google OAuth restricted to `youngmuslims.com`, admin-approval gate
 - Route protection via `src/proxy.ts`
-- App shell (sidebar + mobile nav) and all 7 tab routes as pages
-- Admin screen: approve / reject accounts, toggle admin role
-
-Feature screens (dashboard widgets, feedback survey, neighbornet detail, map,
-team stats, rotation board) are still placeholders — next step.
+- App shell (sidebar + mobile nav)
+- **All feature screens are live against the database:**
+  - Dashboard — stats, goal bar, network orbit, recent visits, grid/map toggle
+  - Submit Feedback — survey with progress, ratings, co-visitors, duplicate
+    detection (link vs separate), edit your own submissions
+  - Neighbornets — list + detail (attendance chart, visit table, feedback-sent
+    toggle), admin add form
+  - Network Map — d3 state map with status pins, region fallback
+  - Cloud Team — per-member visit stats, list + detail
+  - Rotation — join/leave/assign pairings + history
+  - Admin — approve/reject accounts, role toggle, dashboard adjustments
 
 ## First-time setup
 
