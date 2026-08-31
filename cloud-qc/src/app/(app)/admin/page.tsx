@@ -1,12 +1,16 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/authz";
+import { getSettings } from "@/lib/queries";
 import { PageHead } from "@/components/PageHead";
 import { approveUser, rejectUser, setUserRole } from "@/server/actions/admin";
+import { DashboardAdjustments } from "@/components/admin/DashboardAdjustments";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [pending, all] = await Promise.all([
+  const [pending, all, settings] = await Promise.all([
     db.user.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -14,14 +18,23 @@ export default async function AdminPage() {
     db.user.findMany({
       orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
+    getSettings(),
   ]);
 
   return (
     <>
       <PageHead
         title="Admin"
-        desc="Approve accounts and manage roles."
+        desc="Approve accounts, manage roles, and adjust dashboard numbers."
       />
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Dashboard adjustments</div>
+        <DashboardAdjustments
+          manualOffset={settings.manualOffset}
+          goal={settings.goal}
+        />
+      </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="section-label">Pending approval</div>

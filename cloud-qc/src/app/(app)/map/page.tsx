@@ -1,13 +1,35 @@
-import { PageHead, ComingSoon } from "@/components/PageHead";
+import { requireApproved } from "@/lib/authz";
+import { getNeighbornetSummaries } from "@/lib/queries";
+import { isoDate } from "@/lib/format";
+import { PageHead } from "@/components/PageHead";
+import { NetworkMap, type MapNeighbornet } from "@/components/NetworkMap";
 
-export default function MapPage() {
+export const dynamic = "force-dynamic";
+
+export default async function MapPage() {
+  await requireApproved();
+  const summaries = await getNeighbornetSummaries();
+
+  const data: MapNeighbornet[] = summaries.map((n) => ({
+    id: n.id,
+    name: n.name,
+    subArea: n.subArea,
+    region: n.region,
+    stateCode: n.stateCode,
+    latitude: n.latitude,
+    longitude: n.longitude,
+    latestStatus: n.latestVisit?.status ?? null,
+    lastVisitDate: n.latestVisit ? isoDate(n.latestVisit.visitDate) : null,
+    partners: n.partners.map((p) => p.name),
+  }));
+
   return (
     <>
       <PageHead
         title="Network Map"
-        desc="State outlines with a glowing pin for each neighbornet, colored by current status."
+        desc="Real state outlines, glowing pins for each neighbornet — green / amber / red shows current status."
       />
-      <ComingSoon feature="The network map" />
+      <NetworkMap neighbornets={data} />
     </>
   );
 }

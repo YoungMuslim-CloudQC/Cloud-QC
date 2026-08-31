@@ -3,11 +3,15 @@ import { getTeamMemberStats } from "@/lib/queries";
 import { PageHead } from "@/components/PageHead";
 import { TeamStats } from "@/components/team/TeamStats";
 import { MemberList } from "@/components/team/MemberList";
+import { MemberDetail } from "@/components/team/MemberDetail";
 
 export const dynamic = "force-dynamic";
 
-export default async function TeamPage() {
+export default async function TeamMemberPage({
+  params,
+}: PageProps<"/team/[id]">) {
   await requireApproved();
+  const { id } = await params;
   const members = await getTeamMemberStats();
 
   return (
@@ -20,13 +24,10 @@ export default async function TeamPage() {
       <div className="two-col">
         <div className="card">
           <div className="section-label">All members</div>
-          <MemberList members={members} />
+          <MemberList members={members} activeId={id} />
         </div>
         <div className="card">
-          <div className="empty-state">
-            <strong>No member selected</strong>
-            Pick someone from the list to see their visit history.
-          </div>
+          <MemberDetail id={id} />
         </div>
       </div>
     </>

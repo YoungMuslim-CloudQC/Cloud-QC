@@ -1,13 +1,17 @@
 import { requireApproved } from "@/lib/authz";
 import { PageHead } from "@/components/PageHead";
 import { NeighbornetList } from "@/components/neighbornets/NeighbornetList";
+import { NeighbornetDetail } from "@/components/neighbornets/NeighbornetDetail";
 import { AddNeighbornetForm } from "@/components/neighbornets/AddNeighbornetForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function NeighbornetsPage() {
+export default async function NeighbornetPage({
+  params,
+}: PageProps<"/neighbornets/[id]">) {
   const user = await requireApproved();
   const isAdmin = user.role === "ADMIN";
+  const { id } = await params;
 
   return (
     <>
@@ -29,13 +33,10 @@ export default async function NeighbornetsPage() {
       <div className="two-col">
         <div className="card">
           <div className="section-label">All neighbornets</div>
-          <NeighbornetList />
+          <NeighbornetList activeId={id} />
         </div>
         <div className="card">
-          <div className="empty-state">
-            <strong>No neighbornet selected</strong>
-            Pick one from the list to see its history.
-          </div>
+          <NeighbornetDetail id={id} />
         </div>
       </div>
     </>
