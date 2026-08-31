@@ -1,3 +1,4 @@
+# The Next.js app is in cloud-qc/ (it has its own .gitignore).
 node_modules/
 .next/
 .env
@@ -6,15 +7,12 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 
-# The Next.js app lives in cloud-qc/. These root-level files were created by an
-# accidental `npx prisma init` in the wrong directory and are not used — safe to
-# delete. Ignored here so they don't end up in the repo.
+# Guard against a stray `npx prisma init` in this parent directory again.
 /package.json
 /package-lock.json
 /prisma/
+/prisma.config.ts
 /prisma7.config.ts
 /skills-lock.json
-/generated/
 /.agents/
 /.windsurf/
-/.claude/
