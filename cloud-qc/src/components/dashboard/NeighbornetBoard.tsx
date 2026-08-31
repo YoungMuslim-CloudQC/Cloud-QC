@@ -44,8 +44,8 @@ export function NeighbornetBoard({
         ) : (
           <div className="nn-grid">
             {neighbornets.map((n) => {
-              const meta = n.latestStatus
-                ? statusMeta(n.latestStatus)
+              const meta = n.status
+                ? statusMeta(n.status)
                 : { label: "No visits yet", cls: "badge-neutral" };
               return (
                 <Link

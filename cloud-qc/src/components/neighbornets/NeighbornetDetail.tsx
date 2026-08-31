@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { memberName, visitedByLabel } from "@/lib/queries";
+import { hysteresisStatus } from "@/lib/neighbornet-status";
 import { isoDate, statusMeta } from "@/lib/format";
 import { AttendanceChart } from "@/components/neighbornets/AttendanceChart";
 import { FeedbackSentToggle } from "@/components/neighbornets/FeedbackSentToggle";
@@ -38,6 +39,9 @@ export async function NeighbornetDetail({ id }: { id: string }) {
     ? nn.rotations.map((r) => memberName(r.user)).join(", ")
     : "Unassigned";
 
+  const displayStatus = hysteresisStatus(nn.visits);
+  const displayMeta = statusMeta(displayStatus);
+
   const chartPoints = nn.visits
     .filter((v) => v.groupSize != null)
     .map((v) => ({ date: isoDate(v.visitDate), value: v.groupSize as number }));
@@ -51,7 +55,17 @@ export async function NeighbornetDetail({ id }: { id: string }) {
           {nn.name}
           {nn.subArea ? ` — ${nn.subArea}` : ""}
         </span>
-        <span className="badge badge-neutral">Partners: {partnerLabel}</span>
+        <span style={{ display: "flex", gap: 6 }}>
+          {displayStatus && (
+            <span
+              className={`badge ${displayMeta.cls}`}
+              title="Rolled-up status across visit history"
+            >
+              {displayMeta.label}
+            </span>
+          )}
+          <span className="badge badge-neutral">Partners: {partnerLabel}</span>
+        </span>
       </div>
 
       {contactBits.length > 0 && (

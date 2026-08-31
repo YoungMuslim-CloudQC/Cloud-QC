@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { hysteresisStatus } from "@/lib/neighbornet-status";
 
 export function memberName(u: {
   name?: string | null;
@@ -114,7 +115,6 @@ export async function getNeighbornetSummaries() {
     include: {
       visits: {
         orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
-        take: 1,
         select: { id: true, visitDate: true, status: true },
       },
       rotations: {
@@ -133,6 +133,9 @@ export async function getNeighbornetSummaries() {
     latitude: n.latitude ? Number(n.latitude) : null,
     longitude: n.longitude ? Number(n.longitude) : null,
     latestVisit: n.visits[0] ?? null,
+    // Hysteresis roll-up over the whole visit history — this is the status
+    // shown on the dashboard, map pins, and cards.
+    displayStatus: hysteresisStatus(n.visits),
     partners: n.rotations.map((r) => ({
       id: r.user.id,
       name: memberName(r.user),

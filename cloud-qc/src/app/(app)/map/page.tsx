@@ -18,7 +18,7 @@ export default async function MapPage() {
     stateCode: n.stateCode,
     latitude: n.latitude,
     longitude: n.longitude,
-    latestStatus: n.latestVisit?.status ?? null,
+    status: n.displayStatus,
     lastVisitDate: n.latestVisit ? isoDate(n.latestVisit.visitDate) : null,
     partners: n.partners.map((p) => p.name),
   }));

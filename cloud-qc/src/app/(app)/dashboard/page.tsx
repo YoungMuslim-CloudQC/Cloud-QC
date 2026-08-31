@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { getSettings, memberName } from "@/lib/queries";
-import { getNeighbornetSummaries } from "@/lib/queries";
+import { getSettings, memberName, getNeighbornetSummaries } from "@/lib/queries";
+import { needsFollowup as isFollowup } from "@/lib/neighbornet-status";
 import { isoDate, statusMeta } from "@/lib/format";
 import { PageHead } from "@/components/PageHead";
 import { Orbit } from "@/components/dashboard/Orbit";
@@ -34,10 +34,8 @@ export default async function DashboardPage() {
   const avgAttendance = visitAgg._count
     ? Math.round((visitAgg._sum.groupSize ?? 0) / visitAgg._count)
     : 0;
-  const needsFollowup = summaries.filter(
-    (n) =>
-      n.latestVisit?.status === "NEEDS_FOLLOWUP" ||
-      n.latestVisit?.status === "URGENT",
+  const needsFollowup = summaries.filter((n) =>
+    isFollowup(n.displayStatus),
   ).length;
 
   const goalPct =
@@ -53,7 +51,7 @@ export default async function DashboardPage() {
     stateCode: n.stateCode,
     latitude: n.latitude,
     longitude: n.longitude,
-    latestStatus: n.latestVisit?.status ?? null,
+    status: n.displayStatus,
     lastVisitDate: n.latestVisit ? isoDate(n.latestVisit.visitDate) : null,
     partners: n.partners.map((p) => p.name),
   }));
@@ -106,7 +104,7 @@ export default async function DashboardPage() {
               nodes={summaries.map((n) => ({
                 id: n.id,
                 name: n.name,
-                status: n.latestVisit?.status ?? null,
+                status: n.displayStatus,
               }))}
             />
           </div>

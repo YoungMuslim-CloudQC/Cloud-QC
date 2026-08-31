@@ -17,7 +17,7 @@ export type MapNeighbornet = {
   stateCode: string | null;
   latitude: number | null;
   longitude: number | null;
-  latestStatus: string | null;
+  status: string | null;
   lastVisitDate: string | null;
   partners: string[];
 };
@@ -82,7 +82,7 @@ function RegionFallback({ neighbornets }: { neighbornets: MapNeighbornet[] }) {
                     <div className="area-title">{area}</div>
                     <div className="nn-pin-wrap">
                       {pins.map((n) => {
-                        const c = ragColor(n.latestStatus);
+                        const c = ragColor(n.status);
                         return (
                           <Link
                             className="nn-pin"
@@ -199,7 +199,7 @@ function GeoMap({
         );
       })}
       {laid.map((p) => {
-        const c = ragColor(p.latestStatus);
+        const c = ragColor(p.status);
         return (
           <g
             key={`dot-${p.id}`}
@@ -248,7 +248,7 @@ function DetailPanel({ n }: { n: MapNeighbornet | null }) {
       </div>
     );
   }
-  const meta = statusMeta(n.latestStatus);
+  const meta = statusMeta(n.status);
   return (
     <div>
       <div
