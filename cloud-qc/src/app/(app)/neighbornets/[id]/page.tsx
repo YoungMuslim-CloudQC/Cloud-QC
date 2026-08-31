@@ -36,7 +36,7 @@ export default async function NeighbornetPage({
           <NeighbornetList activeId={id} />
         </div>
         <div className="card">
-          <NeighbornetDetail id={id} />
+          <NeighbornetDetail id={id} isAdmin={isAdmin} />
         </div>
       </div>
     </>

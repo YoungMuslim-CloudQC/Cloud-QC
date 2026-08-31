@@ -38,6 +38,8 @@ const STATE_NAMES: Record<string, string> = {
 };
 
 
+const MUTED_PIN = "#948CBB";
+
 function hasCoords(n: MapNeighbornet): n is MapNeighbornet & {
   latitude: number;
   longitude: number;
@@ -50,7 +52,13 @@ function hasCoords(n: MapNeighbornet): n is MapNeighbornet & {
   );
 }
 
-function RegionFallback({ neighbornets }: { neighbornets: MapNeighbornet[] }) {
+function RegionFallback({
+  neighbornets,
+  muted = false,
+}: {
+  neighbornets: MapNeighbornet[];
+  muted?: boolean;
+}) {
   const byRegion = new Map<string, Map<string, MapNeighbornet[]>>();
   for (const n of neighbornets) {
     const r = n.region || "Unassigned region";
@@ -82,7 +90,7 @@ function RegionFallback({ neighbornets }: { neighbornets: MapNeighbornet[] }) {
                     <div className="area-title">{area}</div>
                     <div className="nn-pin-wrap">
                       {pins.map((n) => {
-                        const c = ragColor(n.status);
+                        const c = muted ? MUTED_PIN : ragColor(n.status);
                         return (
                           <Link
                             className="nn-pin"
@@ -114,10 +122,12 @@ function GeoMap({
   stateFeature,
   points,
   onSelect,
+  muted = false,
 }: {
   stateFeature: Feature<Geometry>;
   points: (MapNeighbornet & { latitude: number; longitude: number })[];
   onSelect: (n: MapNeighbornet) => void;
+  muted?: boolean;
 }) {
   const { pathD, laid } = useMemo(() => {
     const projection = geoMercator().fitExtent(
@@ -199,7 +209,7 @@ function GeoMap({
         );
       })}
       {laid.map((p) => {
-        const c = ragColor(p.status);
+        const c = muted ? MUTED_PIN : ragColor(p.status);
         return (
           <g
             key={`dot-${p.id}`}
@@ -239,7 +249,13 @@ function GeoMap({
   );
 }
 
-function DetailPanel({ n }: { n: MapNeighbornet | null }) {
+function DetailPanel({
+  n,
+  muted = false,
+}: {
+  n: MapNeighbornet | null;
+  muted?: boolean;
+}) {
   if (!n) {
     return (
       <div className="empty-state" style={{ padding: "16px 6px" }}>
@@ -263,7 +279,9 @@ function DetailPanel({ n }: { n: MapNeighbornet | null }) {
         {n.subArea}
       </div>
       <div style={{ marginBottom: 10 }}>
-        <span className={`badge ${meta.cls}`}>{meta.label}</span>
+        <span className={`badge ${muted ? "badge-neutral" : meta.cls}`}>
+          {muted ? "Archived" : meta.label}
+        </span>
       </div>
       <div style={{ fontSize: 12.5, marginBottom: 6 }}>
         <strong>Last visit:</strong> {n.lastVisitDate ?? "—"}
@@ -285,8 +303,13 @@ function DetailPanel({ n }: { n: MapNeighbornet | null }) {
 
 export function NetworkMap({
   neighbornets,
+  muted = false,
+  emptyLabel,
 }: {
   neighbornets: MapNeighbornet[];
+  /** Render every pin in a muted gray, ignoring status (e.g. archived view). */
+  muted?: boolean;
+  emptyLabel?: { title: string; body: string };
 }) {
   const withCoords = neighbornets.filter(hasCoords);
   const missing = neighbornets.filter((n) => !hasCoords(n));
@@ -328,8 +351,8 @@ export function NetworkMap({
   if (!neighbornets.length) {
     return (
       <div className="empty-state">
-        <strong>No neighbornets yet</strong>
-        They will appear here once added.
+        <strong>{emptyLabel?.title ?? "No neighbornets yet"}</strong>
+        {emptyLabel?.body ?? "They will appear here once added."}
       </div>
     );
   }
@@ -342,7 +365,7 @@ export function NetworkMap({
           Add latitude/longitude to a neighbornet to see the real map. Showing
           the region view instead.
         </div>
-        <RegionFallback neighbornets={neighbornets} />
+        <RegionFallback neighbornets={neighbornets} muted={muted} />
       </>
     );
   }
@@ -401,6 +424,7 @@ export function NetworkMap({
                 stateFeature={stateFeature}
                 points={statePoints}
                 onSelect={setSelected}
+                muted={muted}
               />
             )}
           </div>
@@ -418,7 +442,7 @@ export function NetworkMap({
           )}
         </div>
         <div className="geo-map-side">
-          <DetailPanel n={selected} />
+          <DetailPanel n={selected} muted={muted} />
         </div>
       </div>
     </>

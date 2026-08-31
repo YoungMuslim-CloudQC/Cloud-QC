@@ -7,11 +7,22 @@ import { hysteresisStatus } from "@/lib/neighbornet-status";
 import { isoDate, statusMeta } from "@/lib/format";
 import { AttendanceChart } from "@/components/neighbornets/AttendanceChart";
 import { FeedbackSentToggle } from "@/components/neighbornets/FeedbackSentToggle";
+import {
+  archiveNeighbornet,
+  unarchiveNeighbornet,
+} from "@/server/actions/neighbornets";
 
-export async function NeighbornetDetail({ id }: { id: string }) {
+export async function NeighbornetDetail({
+  id,
+  isAdmin = false,
+}: {
+  id: string;
+  isAdmin?: boolean;
+}) {
   const nn = await db.neighbornet.findUnique({
     where: { id },
     include: {
+      archivedBy: { select: { name: true, email: true } },
       rotations: {
         where: { endedOn: null },
         orderBy: { startedOn: "asc" },
@@ -35,8 +46,9 @@ export async function NeighbornetDetail({ id }: { id: string }) {
     },
   });
 
-  if (!nn || nn.archivedAt) notFound();
+  if (!nn) notFound();
 
+  const archived = nn.archivedAt != null;
   const partnerLabel = nn.rotations.length
     ? nn.rotations.map((r) => memberName(r.user)).join(", ")
     : "Unassigned";
@@ -58,7 +70,12 @@ export async function NeighbornetDetail({ id }: { id: string }) {
           {nn.subArea ? ` — ${nn.subArea}` : ""}
         </span>
         <span style={{ display: "flex", gap: 6 }}>
-          {displayStatus && (
+          {archived && (
+            <span className="badge badge-neutral" title="This neighbornet is archived">
+              Archived
+            </span>
+          )}
+          {!archived && displayStatus && (
             <span
               className={`badge ${displayMeta.cls}`}
               title="Rolled-up status across visit history"
@@ -69,6 +86,34 @@ export async function NeighbornetDetail({ id }: { id: string }) {
           <span className="badge badge-neutral">Partners: {partnerLabel}</span>
         </span>
       </div>
+
+      {archived && (
+        <div
+          className="shared-banner"
+          style={{ borderLeftColor: "var(--text-muted)" }}
+        >
+          Archived{nn.archivedAt ? ` ${isoDate(nn.archivedAt)}` : ""}
+          {nn.archivedBy ? ` by ${memberName(nn.archivedBy)}` : ""}. It&apos;s
+          hidden from the neighbornet list, feedback form, rotation, and map —
+          its past visits still count in all stats.
+        </div>
+      )}
+
+      {isAdmin && (
+        <form
+          action={archived ? unarchiveNeighbornet : archiveNeighbornet}
+          style={{ marginBottom: 14 }}
+        >
+          <input type="hidden" name="id" value={nn.id} />
+          <button
+            type="submit"
+            className={`btn btn-small ${archived ? "btn-primary" : "btn-secondary"}`}
+            style={archived ? { width: "auto" } : undefined}
+          >
+            {archived ? "Unarchive" : "Archive"}
+          </button>
+        </form>
+      )}
 
       {contactBits.length > 0 && (
         <div

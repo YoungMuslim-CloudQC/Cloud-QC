@@ -82,3 +82,34 @@ export async function addNeighbornet(
   revalidatePath("/map");
   redirect(`/neighbornets/${created.id}`);
 }
+
+function revalidateNeighbornetViews() {
+  revalidatePath("/neighbornets", "layout");
+  revalidatePath("/dashboard");
+  revalidatePath("/map");
+  revalidatePath("/rotation");
+  revalidatePath("/feedback");
+  revalidatePath("/admin/archived-neighbornets");
+}
+
+export async function archiveNeighbornet(formData: FormData) {
+  const admin = await assertAdmin();
+  const id = z.string().min(1).parse(formData.get("id"));
+  await db.neighbornet.update({
+    where: { id },
+    data: { archivedAt: new Date(), archivedById: admin.id },
+  });
+  revalidateNeighbornetViews();
+  revalidatePath(`/neighbornets/${id}`);
+}
+
+export async function unarchiveNeighbornet(formData: FormData) {
+  await assertAdmin();
+  const id = z.string().min(1).parse(formData.get("id"));
+  await db.neighbornet.update({
+    where: { id },
+    data: { archivedAt: null, archivedById: null },
+  });
+  revalidateNeighbornetViews();
+  revalidatePath(`/neighbornets/${id}`);
+}

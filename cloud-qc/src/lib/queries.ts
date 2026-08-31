@@ -141,10 +141,13 @@ export type NeighbornetSummary = Awaited<
   ReturnType<typeof getNeighbornetSummaries>
 >[number];
 
-/** Neighbornets with their latest visit and current rotation partners. */
-export async function getNeighbornetSummaries() {
+/** Neighbornets with their latest visit and current rotation partners.
+ *  Defaults to active (non-archived) neighbornets. */
+export async function getNeighbornetSummaries(
+  { archived = false }: { archived?: boolean } = {},
+) {
   const neighbornets = await db.neighbornet.findMany({
-    where: { archivedAt: null },
+    where: { archivedAt: archived ? { not: null } : null },
     orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
     include: {
       visits: {

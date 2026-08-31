@@ -124,8 +124,11 @@ export async function submitFeedback(raw: VisitInput): Promise<SubmitResult> {
     where: { id: input.neighbornetId },
     select: { id: true, name: true, archivedAt: true },
   });
-  if (!nn || nn.archivedAt) {
+  if (!nn) {
     return { ok: false, error: "That neighbornet doesn't exist." };
+  }
+  if (nn.archivedAt) {
+    return { ok: false, error: "That neighbornet is archived." };
   }
 
   const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
