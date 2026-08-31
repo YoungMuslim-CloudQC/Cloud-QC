@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { googleEnabled } from "@/lib/auth.config";
+import { googleEnabled, googleHostedDomain } from "@/lib/auth.config";
 import { CloudMark } from "@/components/Brand";
 import { GoogleButton } from "@/components/GoogleButton";
 import { SignupForm } from "@/components/auth/SignupForm";
@@ -27,6 +27,11 @@ export default function SignupPage() {
         <>
           <div className="auth-divider">or</div>
           <GoogleButton label="Sign up with Google" />
+          {googleHostedDomain && (
+            <div className="auth-fine" style={{ marginTop: 8 }}>
+              Requires an @{googleHostedDomain} account.
+            </div>
+          )}
         </>
       )}
 

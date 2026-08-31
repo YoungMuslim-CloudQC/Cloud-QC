@@ -1,12 +1,15 @@
 import Link from "next/link";
 
-import { googleEnabled } from "@/lib/auth.config";
+import { googleEnabled, googleHostedDomain } from "@/lib/auth.config";
 import { CloudMark } from "@/components/Brand";
 import { GoogleButton } from "@/components/GoogleButton";
 import { LoginForm } from "@/components/auth/LoginForm";
 
 const ERROR_MESSAGES: Record<string, string> = {
   AccountNotApproved: "Your account is still waiting for admin approval.",
+  AccessDenied: googleHostedDomain
+    ? `Google sign-in is limited to @${googleHostedDomain} accounts.`
+    : "That account can't sign in here.",
   OAuthAccountNotLinked:
     "This email is already registered with a different sign-in method.",
   Configuration: "Sign-in is temporarily unavailable. Try again shortly.",
@@ -44,6 +47,11 @@ export default async function LoginPage({
         <>
           <div className="auth-divider">or</div>
           <GoogleButton />
+          {googleHostedDomain && (
+            <div className="auth-fine" style={{ marginTop: 8 }}>
+              Google sign-in requires an @{googleHostedDomain} account.
+            </div>
+          )}
         </>
       )}
 

@@ -13,15 +13,33 @@ export const googleEnabled = Boolean(
   process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
 );
 
+/** If set, Google sign-in is restricted to this Google Workspace domain. */
+export const googleHostedDomain =
+  process.env.GOOGLE_HOSTED_DOMAIN?.toLowerCase().trim() || undefined;
+
 if (googleEnabled) {
   providers.push(
     Google({
       // Same email via Google or password links to one account. Safe here
       // because Google verifies email ownership.
       allowDangerousEmailAccountLinking: true,
+      authorization: {
+        params: {
+          // UX hint — Google only offers accounts on this domain. Not a
+          // security boundary; the real check is in the signIn callback.
+          ...(googleHostedDomain ? { hd: googleHostedDomain } : {}),
+          prompt: "select_account",
+        },
+      },
     }),
   );
 }
+
+type GoogleProfile = {
+  email?: string;
+  email_verified?: boolean;
+  hd?: string;
+};
 
 export default {
   providers,
@@ -32,6 +50,18 @@ export default {
     error: "/login",
   },
   callbacks: {
+    signIn({ account, profile }) {
+      // Enforce the Workspace-domain restriction for Google sign-in.
+      if (account?.provider === "google" && googleHostedDomain) {
+        const p = profile as GoogleProfile | undefined;
+        const email = p?.email?.toLowerCase() ?? "";
+        const domainOk =
+          p?.hd?.toLowerCase() === googleHostedDomain &&
+          email.endsWith(`@${googleHostedDomain}`);
+        if (!p?.email_verified || !domainOk) return false;
+      }
+      return true;
+    },
     jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id as string;
