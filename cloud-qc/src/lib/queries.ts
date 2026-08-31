@@ -228,6 +228,20 @@ export type NeighbornetSummary = Awaited<
   ReturnType<typeof getNeighbornetSummaries>
 >[number];
 
+/** Distinct 2-letter state codes already in use — seeds the location picker. */
+export async function getUsedStateCodes(): Promise<string[]> {
+  const rows = await db.neighbornet.findMany({
+    where: { stateCode: { not: null } },
+    select: { stateCode: true },
+    distinct: ["stateCode"],
+    orderBy: { stateCode: "asc" },
+  });
+  return rows
+    .map((r) => r.stateCode)
+    .filter((c): c is string => Boolean(c))
+    .map((c) => c.toUpperCase());
+}
+
 /** Neighbornets with their latest visit and current rotation partners.
  *  Defaults to active (non-archived) neighbornets. */
 export async function getNeighbornetSummaries(

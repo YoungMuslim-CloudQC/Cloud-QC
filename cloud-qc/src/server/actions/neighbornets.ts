@@ -39,26 +39,36 @@ const schema = z.object({
   instagram: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
 });
 
-export type AddNeighbornetState = {
+export type NeighbornetFormState = {
   ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string>;
 };
 
+function collectFieldErrors(
+  issues: readonly { path: PropertyKey[]; message: string }[],
+): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of issues) {
+    const key = String(issue.path[0] ?? "");
+    if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+  }
+  return fieldErrors;
+}
+
 export async function addNeighbornet(
-  _prev: AddNeighbornetState,
+  _prev: NeighbornetFormState,
   formData: FormData,
-): Promise<AddNeighbornetState> {
+): Promise<NeighbornetFormState> {
   const admin = await assertAdmin();
 
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = String(issue.path[0] ?? "");
-      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
-    }
-    return { ok: false, error: "Please fix the highlighted fields.", fieldErrors };
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: collectFieldErrors(parsed.error.issues),
+    };
   }
 
   const d = parsed.data;
@@ -77,10 +87,51 @@ export async function addNeighbornet(
     },
   });
 
-  revalidatePath("/neighbornets", "layout");
-  revalidatePath("/dashboard");
-  revalidatePath("/map");
+  revalidateNeighbornetViews();
   redirect(`/neighbornets/${created.id}`);
+}
+
+export async function updateNeighbornet(
+  id: string,
+  _prev: NeighbornetFormState,
+  formData: FormData,
+): Promise<NeighbornetFormState> {
+  await assertAdmin();
+
+  const parsed = schema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Please fix the highlighted fields.",
+      fieldErrors: collectFieldErrors(parsed.error.issues),
+    };
+  }
+
+  const existing = await db.neighbornet.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) return { ok: false, error: "That neighbornet no longer exists." };
+
+  const d = parsed.data;
+  await db.neighbornet.update({
+    where: { id },
+    data: {
+      name: d.name,
+      city: d.city ?? null,
+      region: d.region,
+      subArea: d.subArea,
+      stateCode: d.stateCode ?? null,
+      latitude: d.latitude ?? null,
+      longitude: d.longitude ?? null,
+      contactEmail: d.contactEmail ?? null,
+      instagram: d.instagram ?? null,
+    },
+  });
+
+  revalidateNeighbornetViews();
+  revalidatePath(`/neighbornets/${id}`);
+  redirect(`/neighbornets/${id}`);
 }
 
 function revalidateNeighbornetViews() {

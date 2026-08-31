@@ -100,19 +100,31 @@ export async function NeighbornetDetail({
       )}
 
       {isAdmin && (
-        <form
-          action={archived ? unarchiveNeighbornet : archiveNeighbornet}
-          style={{ marginBottom: 14 }}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 14,
+            flexWrap: "wrap",
+          }}
         >
-          <input type="hidden" name="id" value={nn.id} />
-          <button
-            type="submit"
-            className={`btn btn-small ${archived ? "btn-primary" : "btn-secondary"}`}
-            style={archived ? { width: "auto" } : undefined}
+          <Link
+            className="btn btn-secondary btn-small"
+            href={`/neighbornets/${nn.id}/edit`}
           >
-            {archived ? "Unarchive" : "Archive"}
-          </button>
-        </form>
+            Edit
+          </Link>
+          <form action={archived ? unarchiveNeighbornet : archiveNeighbornet}>
+            <input type="hidden" name="id" value={nn.id} />
+            <button
+              type="submit"
+              className={`btn btn-small ${archived ? "btn-primary" : "btn-secondary"}`}
+              style={archived ? { width: "auto" } : undefined}
+            >
+              {archived ? "Unarchive" : "Archive"}
+            </button>
+          </form>
+        </div>
       )}
 
       {contactBits.length > 0 && (

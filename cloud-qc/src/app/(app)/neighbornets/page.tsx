@@ -1,7 +1,8 @@
+import Link from "next/link";
+
 import { requireApproved } from "@/lib/authz";
 import { PageHead } from "@/components/PageHead";
 import { NeighbornetList } from "@/components/neighbornets/NeighbornetList";
-import { AddNeighbornetForm } from "@/components/neighbornets/AddNeighbornetForm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,10 @@ export default async function NeighbornetsPage() {
       />
 
       {isAdmin && (
-        <div className="card" style={{ marginBottom: 20, maxWidth: 640 }}>
-          <div className="section-label">
-            Add a neighbornet{" "}
-            <span className="badge badge-neutral">Admin only</span>
-          </div>
-          <AddNeighbornetForm />
+        <div style={{ marginBottom: 16 }}>
+          <Link className="btn btn-secondary btn-small" href="/neighbornets/new">
+            + Add a neighbornet
+          </Link>
         </div>
       )}
 
