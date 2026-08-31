@@ -1,5 +1,7 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
+
 import { db } from "@/lib/db";
 import { hysteresisStatus } from "@/lib/neighbornet-status";
 
@@ -36,13 +38,44 @@ export async function getSettings() {
   };
 }
 
-/** Total logged visits = participant rows + manual offset (never negative). */
+/** Total logged visits = participant rows (of live visits) + manual offset. */
 export async function getVisitTotal() {
   const [participants, settings] = await Promise.all([
-    db.visitParticipant.count(),
+    db.visitParticipant.count({ where: { visit: { deletedAt: null } } }),
     getSettings(),
   ]);
   return Math.max(0, participants + settings.manualOffset);
+}
+
+const VISIT_DETAIL_INCLUDE = {
+  neighbornet: { select: { id: true, name: true, subArea: true } },
+  submittedBy: { select: { id: true, name: true, email: true } },
+  participants: {
+    include: { user: { select: { id: true, name: true, email: true } } },
+  },
+  comments: {
+    orderBy: { createdAt: "asc" },
+    include: { author: { select: { name: true, email: true } } },
+  },
+  history: {
+    orderBy: { performedAt: "asc" },
+    include: { performedBy: { select: { name: true, email: true } } },
+  },
+} satisfies Prisma.VisitInclude;
+
+export async function getVisitWithHistory(id: string) {
+  return db.visit.findUnique({
+    where: { id },
+    include: VISIT_DETAIL_INCLUDE,
+  });
+}
+
+export async function getDeletedVisits() {
+  return db.visit.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: "desc" },
+    include: VISIT_DETAIL_INCLUDE,
+  });
 }
 
 export type MemberStat = {
@@ -66,6 +99,7 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
       select: { id: true, name: true, email: true, role: true },
     }),
     db.visitParticipant.findMany({
+      where: { visit: { deletedAt: null } },
       select: {
         userId: true,
         visit: {
@@ -114,6 +148,7 @@ export async function getNeighbornetSummaries() {
     orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
     include: {
       visits: {
+        where: { deletedAt: null },
         orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
         select: { id: true, visitDate: true, status: true },
       },
@@ -124,7 +159,7 @@ export async function getNeighbornetSummaries() {
           user: { select: { id: true, name: true, email: true } },
         },
       },
-      _count: { select: { visits: true } },
+      _count: { select: { visits: { where: { deletedAt: null } } } },
     },
   });
 

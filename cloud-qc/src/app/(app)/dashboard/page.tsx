@@ -14,9 +14,14 @@ export default async function DashboardPage() {
     await Promise.all([
       getNeighbornetSummaries(),
       getSettings(),
-      db.visitParticipant.count(),
-      db.visit.aggregate({ _sum: { groupSize: true }, _count: true }),
+      db.visitParticipant.count({ where: { visit: { deletedAt: null } } }),
+      db.visit.aggregate({
+        where: { deletedAt: null },
+        _sum: { groupSize: true },
+        _count: true,
+      }),
       db.visit.findMany({
+        where: { deletedAt: null },
         orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
         take: 6,
         include: {

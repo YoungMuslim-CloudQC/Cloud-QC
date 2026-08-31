@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { db } from "@/lib/db";
@@ -13,7 +14,7 @@ export async function MemberDetail({ id }: { id: string }) {
   if (!member || member.status !== "APPROVED") notFound();
 
   const participations = await db.visitParticipant.findMany({
-    where: { userId: id },
+    where: { userId: id, visit: { deletedAt: null } },
     include: {
       visit: {
         include: { neighbornet: { select: { name: true } } },
@@ -80,7 +81,11 @@ export async function MemberDetail({ id }: { id: string }) {
                 const filled = p.role === "SUBMITTER" || p.contributed;
                 return (
                   <tr key={p.id}>
-                    <td data-label="Neighbornet">{p.visit.neighbornet.name}</td>
+                    <td data-label="Neighbornet">
+                      <Link href={`/visits/${p.visit.id}`}>
+                        {p.visit.neighbornet.name}
+                      </Link>
+                    </td>
                     <td className="cell-mono" data-label="Visit date">
                       {isoDate(p.visit.visitDate)}
                     </td>

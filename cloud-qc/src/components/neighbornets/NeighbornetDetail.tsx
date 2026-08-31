@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { db } from "@/lib/db";
@@ -17,6 +18,7 @@ export async function NeighbornetDetail({ id }: { id: string }) {
         include: { user: { select: { name: true, email: true } } },
       },
       visits: {
+        where: { deletedAt: null },
         orderBy: [{ visitDate: "asc" }, { createdAt: "asc" }],
         include: {
           submittedBy: { select: { name: true, email: true } },
@@ -106,7 +108,9 @@ export async function NeighbornetDetail({ id }: { id: string }) {
                   return (
                     <tr key={v.id}>
                       <td className="cell-mono" data-label="Date">
-                        {isoDate(v.visitDate)}
+                        <Link href={`/visits/${v.id}`}>
+                          {isoDate(v.visitDate)}
+                        </Link>
                       </td>
                       <td data-label="Visited by">
                         {visitedByLabel(v.submittedBy, v.participants)}

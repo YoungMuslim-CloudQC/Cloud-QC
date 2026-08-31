@@ -30,7 +30,7 @@ export default async function FeedbackPage({
         select: { id: true, name: true, email: true },
       }),
       db.visit.findMany({
-        where: { submittedById: user.id },
+        where: { submittedById: user.id, deletedAt: null },
         orderBy: { visitDate: "desc" },
         include: { neighbornet: { select: { name: true } } },
       }),
@@ -42,8 +42,13 @@ export default async function FeedbackPage({
         : Promise.resolve(null),
     ]);
 
+  const canEditVisit =
+    editingVisit != null &&
+    editingVisit.deletedAt == null &&
+    (editingVisit.submittedById === user.id || user.role === "ADMIN");
+
   let editing: { visitId: string; input: VisitInput } | null = null;
-  if (editingVisit && editingVisit.submittedById === user.id) {
+  if (editingVisit && canEditVisit) {
     editing = {
       visitId: editingVisit.id,
       input: {
@@ -98,7 +103,9 @@ export default async function FeedbackPage({
                 key={v.id}
                 style={{ gridTemplateColumns: "90px 1fr 90px" }}
               >
-                <div className="visit-date">{isoDate(v.visitDate)}</div>
+                <div className="visit-date">
+                  <Link href={`/visits/${v.id}`}>{isoDate(v.visitDate)}</Link>
+                </div>
                 <div>
                   <div className="visit-nn">{v.neighbornet.name}</div>
                   <span className={`badge ${meta.cls}`}>{meta.label}</span>

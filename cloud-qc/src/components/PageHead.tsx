@@ -3,7 +3,7 @@ export function PageHead({
   desc,
 }: {
   title: string;
-  desc?: string;
+  desc?: React.ReactNode;
 }) {
   return (
     <div className="page-head">

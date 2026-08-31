@@ -4,7 +4,7 @@ import { getVisitTotal, type MemberStat } from "@/lib/queries";
 export async function TeamStats({ members }: { members: MemberStat[] }) {
   const [visitTotal, notSent] = await Promise.all([
     getVisitTotal(),
-    db.visit.count({ where: { feedbackSent: false } }),
+    db.visit.count({ where: { feedbackSent: false, deletedAt: null } }),
   ]);
   const avg =
     members.length > 0

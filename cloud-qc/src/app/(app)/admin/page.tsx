@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/authz";
 import { getSettings } from "@/lib/queries";
@@ -34,6 +36,19 @@ export default async function AdminPage() {
           manualOffset={settings.manualOffset}
           goal={settings.goal}
         />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Deleted visits</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          Review soft-deleted visits and their full history, and restore them.
+        </p>
+        <Link
+          className="btn btn-secondary btn-small"
+          href="/admin/deleted-visits"
+        >
+          Open deleted visits
+        </Link>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

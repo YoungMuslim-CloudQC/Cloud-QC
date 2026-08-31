@@ -37,6 +37,13 @@ enum ParticipantRole {
   CO_VISITOR
 }
 
+enum VisitHistoryAction {
+  CREATED
+  EDITED
+  DELETED
+  RESTORED
+}
+
 // ---------------------------------------------------------------------------
 // Auth & people
 // Prototype had separate `users` and `members`; here an approved User *is* a
@@ -60,6 +67,7 @@ model User {
   submittedVisits     Visit[]              @relation("VisitSubmittedBy")
   participations      VisitParticipant[]
   comments            VisitComment[]
+  visitHistoryEntries VisitHistory[]
   rotations           RotationAssignment[] @relation("RotationUser")
   rotationsAssigned   RotationAssignment[] @relation("RotationAssignedBy")
   neighbornetsCreated Neighbornet[]        @relation("NeighbornetCreatedBy")
@@ -155,6 +163,7 @@ model Visit {
   status           VisitStatus?
   notes            String // required
   feedbackSent     Boolean      @default(false)
+  deletedAt        DateTime? // soft delete — excluded everywhere by default
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -166,9 +175,28 @@ model Visit {
 
   participants VisitParticipant[]
   comments     VisitComment[]
+  history      VisitHistory[]
 
   @@index([neighbornetId, visitDate])
   @@index([submittedById])
+  @@index([deletedAt])
+}
+
+// Append-only audit log — one row per create / edit / delete / restore of a
+// visit, with a full JSON snapshot of the visit's state at that moment.
+model VisitHistory {
+  id          String            @id @default(cuid())
+  action      VisitHistoryAction
+  snapshot    Json
+  performedAt DateTime          @default(now())
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  performedById String
+  performedBy   User   @relation(fields: [performedById], references: [id])
+
+  @@index([visitId, performedAt])
 }
 
 // Replaces the prototype's `submittedBy` string + `coVisitors` array.

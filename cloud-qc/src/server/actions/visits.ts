@@ -1,15 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 import { assertApproved } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { memberName } from "@/lib/queries";
 import {
+  buildVisitSnapshot,
+  VISIT_SNAPSHOT_INCLUDE,
+} from "@/lib/visit-history";
+import {
   visitInputSchema,
   type VisitInput,
   type SubmitResult,
 } from "@/lib/visit-schema";
+
+type HistoryAction = "CREATED" | "EDITED" | "DELETED" | "RESTORED";
 
 function revalidateVisitViews() {
   revalidatePath("/dashboard");
@@ -17,10 +24,61 @@ function revalidateVisitViews() {
   revalidatePath("/neighbornets", "layout");
   revalidatePath("/team", "layout");
   revalidatePath("/map");
+  revalidatePath("/visits", "layout");
+  revalidatePath("/admin/deleted-visits");
+}
+
+/** Snapshot the visit's current state and append a history row. */
+async function recordHistory(
+  visitId: string,
+  action: HistoryAction,
+  performedById: string,
+) {
+  const visit = await db.visit.findUnique({
+    where: { id: visitId },
+    include: VISIT_SNAPSHOT_INCLUDE,
+  });
+  if (!visit) return;
+  await db.visitHistory.create({
+    data: {
+      visitId,
+      action,
+      performedById,
+      snapshot: buildVisitSnapshot(visit) as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+
+type ModifiableVisit = Prisma.VisitGetPayload<{
+  include: { participants: true };
+}>;
+type LoadResult =
+  | { ok: false; error: string }
+  | { ok: true; visit: ModifiableVisit };
+
+/** Edit / delete / restore permission — same rule as editing:
+ *  the original submitter, or any admin. */
+async function loadModifiableVisit(
+  visitId: string,
+  userId: string,
+  isAdmin: boolean,
+): Promise<LoadResult> {
+  const visit = await db.visit.findUnique({
+    where: { id: visitId },
+    include: { participants: true },
+  });
+  if (!visit) return { ok: false, error: "That visit no longer exists." };
+  if (visit.submittedById !== userId && !isAdmin) {
+    return {
+      ok: false,
+      error: "You don't have permission to change this visit.",
+    };
+  }
+  return { ok: true, visit };
 }
 
 async function createVisit(userId: string, input: VisitInput) {
-  return db.visit.create({
+  const visit = await db.visit.create({
     data: {
       neighbornetId: input.neighbornetId,
       visitDate: new Date(`${input.visitDate}T00:00:00.000Z`),
@@ -46,6 +104,8 @@ async function createVisit(userId: string, input: VisitInput) {
       },
     },
   });
+  await recordHistory(visit.id, "CREATED", userId);
+  return visit;
 }
 
 /**
@@ -73,6 +133,7 @@ export async function submitFeedback(raw: VisitInput): Promise<SubmitResult> {
     where: {
       neighbornetId: input.neighbornetId,
       visitDate,
+      deletedAt: null,
       submittedById: { not: user.id },
       participants: { none: { userId: user.id } },
     },
@@ -124,7 +185,9 @@ export async function linkToExistingVisit(
     where: { id: existingVisitId },
     include: { participants: { select: { userId: true } } },
   });
-  if (!visit) return { ok: false, error: "That visit no longer exists." };
+  if (!visit || visit.deletedAt) {
+    return { ok: false, error: "That visit no longer exists." };
+  }
 
   const present = new Set(visit.participants.map((p) => p.userId));
   present.add(visit.submittedById);
@@ -158,11 +221,12 @@ export async function linkToExistingVisit(
       : []),
   ]);
 
+  await recordHistory(visit.id, "EDITED", user.id);
   revalidateVisitViews();
   return { ok: true, visitId: visit.id };
 }
 
-/** Edit a visit you submitted. */
+/** Edit a visit (original submitter, or an admin). */
 export async function updateFeedback(
   visitId: string,
   raw: VisitInput,
@@ -174,16 +238,20 @@ export async function updateFeedback(
   }
   const input = parsed.data;
 
-  const visit = await db.visit.findUnique({
-    where: { id: visitId },
-    include: { participants: true },
-  });
-  if (!visit) return { ok: false, error: "That visit no longer exists." };
-  if (visit.submittedById !== user.id) {
-    return { ok: false, error: "You can only edit visits you submitted." };
+  const loaded = await loadModifiableVisit(
+    visitId,
+    user.id,
+    user.role === "ADMIN",
+  );
+  if (!loaded.ok) return loaded;
+  const { visit } = loaded;
+  if (visit.deletedAt) {
+    return { ok: false, error: "Restore this visit before editing it." };
   }
 
-  const desired = new Set(input.coVisitorIds.filter((id) => id !== user.id));
+  const desired = new Set(
+    input.coVisitorIds.filter((id) => id !== visit.submittedById),
+  );
   const currentCo = visit.participants.filter((p) => p.role === "CO_VISITOR");
   const removeIds = currentCo
     .filter((p) => !desired.has(p.userId))
@@ -224,20 +292,64 @@ export async function updateFeedback(
       : []),
   ]);
 
+  await recordHistory(visitId, "EDITED", user.id);
   revalidateVisitViews();
   return { ok: true, visitId };
 }
 
 export async function toggleFeedbackSent(visitId: string) {
-  await assertApproved();
+  const user = await assertApproved();
   const visit = await db.visit.findUnique({
     where: { id: visitId },
-    select: { feedbackSent: true },
+    select: { feedbackSent: true, deletedAt: true },
   });
-  if (!visit) return;
+  if (!visit || visit.deletedAt) return;
   await db.visit.update({
     where: { id: visitId },
     data: { feedbackSent: !visit.feedbackSent },
   });
+  await recordHistory(visitId, "EDITED", user.id);
   revalidateVisitViews();
+}
+
+export async function deleteVisit(visitId: string): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const loaded = await loadModifiableVisit(
+    visitId,
+    user.id,
+    user.role === "ADMIN",
+  );
+  if (!loaded.ok) return loaded;
+  if (loaded.visit.deletedAt) {
+    return { ok: false, error: "That visit is already deleted." };
+  }
+
+  await db.visit.update({
+    where: { id: visitId },
+    data: { deletedAt: new Date() },
+  });
+  await recordHistory(visitId, "DELETED", user.id);
+  revalidateVisitViews();
+  return { ok: true, visitId };
+}
+
+export async function restoreVisit(visitId: string): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const loaded = await loadModifiableVisit(
+    visitId,
+    user.id,
+    user.role === "ADMIN",
+  );
+  if (!loaded.ok) return loaded;
+  if (!loaded.visit.deletedAt) {
+    return { ok: false, error: "That visit isn't deleted." };
+  }
+
+  await db.visit.update({
+    where: { id: visitId },
+    data: { deletedAt: null },
+  });
+  await recordHistory(visitId, "RESTORED", user.id);
+  revalidateVisitViews();
+  return { ok: true, visitId };
 }
