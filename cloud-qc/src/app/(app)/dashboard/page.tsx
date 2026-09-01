@@ -50,7 +50,7 @@ export default async function DashboardPage() {
     .map((s) => ({
       id: s.id,
       name: s.name,
-      subArea: s.subArea,
+      subArea: s.subArea ?? "",
       displayStatus: s.displayStatus,
     }));
 
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
   const mapData: MapNeighbornet[] = summaries.map((n) => ({
     id: n.id,
     name: n.name,
-    subArea: n.subArea,
+    subArea: n.subArea ?? "",
     region: n.region,
     stateCode: n.stateCode,
     latitude: n.latitude,

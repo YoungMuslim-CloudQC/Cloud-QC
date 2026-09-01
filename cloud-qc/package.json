@@ -15,6 +15,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "audit:neighbornets": "tsx scripts/audit-neighbornets.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

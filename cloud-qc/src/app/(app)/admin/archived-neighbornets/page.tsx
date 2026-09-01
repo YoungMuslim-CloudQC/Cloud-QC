@@ -13,7 +13,7 @@ export default async function ArchivedNeighbornetsPage() {
   const data: MapNeighbornet[] = summaries.map((n) => ({
     id: n.id,
     name: n.name,
-    subArea: n.subArea,
+    subArea: n.subArea ?? "",
     region: n.region,
     stateCode: n.stateCode,
     latitude: n.latitude,

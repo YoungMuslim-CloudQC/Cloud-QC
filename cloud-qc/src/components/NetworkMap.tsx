@@ -291,11 +291,14 @@ export function NetworkMap({
   neighbornets,
   muted = false,
   emptyLabel,
+  initialState = "",
 }: {
   neighbornets: MapNeighbornet[];
   /** Render every pin in a muted gray, ignoring status (e.g. archived view). */
   muted?: boolean;
   emptyLabel?: { title: string; body: string };
+  /** Pre-select this 2-letter state code (e.g. drilled in from the country map). */
+  initialState?: string;
 }) {
   const withCoords = neighbornets.filter(hasCoords);
   const missing = neighbornets.filter((n) => !hasCoords(n));
@@ -308,7 +311,9 @@ export function NetworkMap({
     [withCoords],
   );
 
-  const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>(
+    initialState.toUpperCase(),
+  );
   const [selected, setSelected] = useState<MapNeighbornet | null>(null);
   const [topo, setTopo] = useState<Topology | null>(null);
   const [topoError, setTopoError] = useState(false);

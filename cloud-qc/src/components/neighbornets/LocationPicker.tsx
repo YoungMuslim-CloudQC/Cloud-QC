@@ -4,11 +4,10 @@ import { geoMercator, geoPath } from "d3-geo";
 import { useEffect, useState } from "react";
 import type { Topology } from "topojson-specification";
 
-import { STATE_NAMES, loadStatesTopo, stateFeature } from "@/lib/us-map";
+import { STATE_NAMES, STATE_CODES, loadStatesTopo, stateFeature } from "@/lib/us-map";
 
 const W = 640;
 const H = 520;
-const NEW_STATE = "__new__";
 
 type Point = { lat: number; lng: number };
 
@@ -16,6 +15,7 @@ export function LocationPicker({
   existingStates,
   initial,
 }: {
+  /** Codes already in use — only used to pick a sensible default. */
   existingStates: string[];
   initial?: {
     stateCode: string | null;
@@ -23,17 +23,11 @@ export function LocationPicker({
     longitude: number | null;
   };
 }) {
-  const optionSet = new Set(
-    existingStates.map((c) => c.toUpperCase()).filter(Boolean),
-  );
-  if (initial?.stateCode) optionSet.add(initial.stateCode.toUpperCase());
-  const options = [...optionSet].sort();
-
   const [selected, setSelected] = useState<string>(
-    initial?.stateCode?.toUpperCase() ?? options[0] ?? "",
+    initial?.stateCode?.toUpperCase() ??
+      existingStates[0]?.toUpperCase() ??
+      "",
   );
-  const [addingNew, setAddingNew] = useState(false);
-  const [newCode, setNewCode] = useState("");
   const [topo, setTopo] = useState<Topology | null>(null);
   const [topoError, setTopoError] = useState(false);
 
@@ -58,7 +52,7 @@ export function LocationPicker({
     };
   }, []);
 
-  const code = addingNew ? newCode.toUpperCase() : selected;
+  const code = selected;
   const stateName = STATE_NAMES[code];
 
   let pathD: string | null = null;
@@ -105,55 +99,23 @@ export function LocationPicker({
         Location <span className="optional-tag">click the map to place a pin</span>
       </label>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        {addingNew ? (
-          <>
-            <input
-              type="text"
-              value={newCode}
-              maxLength={2}
-              placeholder="2-letter code, e.g. NY"
-              style={{ textTransform: "uppercase", maxWidth: 180 }}
-              onChange={(e) =>
-                setNewCode(e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase())
-              }
-            />
-            <button
-              type="button"
-              className="btn btn-secondary btn-small"
-              onClick={() => {
-                setAddingNew(false);
-                setNewCode("");
-              }}
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <select
-            value={selected}
-            style={{ maxWidth: 260 }}
-            onChange={(e) => {
-              if (e.target.value === NEW_STATE) {
-                setAddingNew(true);
-              } else {
-                setSelected(e.target.value);
-              }
-            }}
-          >
-            {options.length === 0 && (
-              <option value="" disabled>
-                No states yet
-              </option>
-            )}
-            {options.map((c) => (
-              <option key={c} value={c}>
-                {STATE_NAMES[c] ?? c} ({c})
-              </option>
-            ))}
-            <option value={NEW_STATE}>+ Add a new state…</option>
-          </select>
-        )}
+      <div style={{ marginBottom: 8 }}>
+        <select
+          name="stateCode"
+          required
+          value={selected}
+          style={{ maxWidth: 260 }}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="" disabled>
+            Select a state…
+          </option>
+          {STATE_CODES.map((c) => (
+            <option key={c} value={c}>
+              {STATE_NAMES[c]} ({c})
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="geo-map-card" style={{ padding: 12 }}>
@@ -227,7 +189,6 @@ export function LocationPicker({
         )}
       </div>
 
-      <input type="hidden" name="stateCode" value={code} />
       <input
         type="hidden"
         name="latitude"

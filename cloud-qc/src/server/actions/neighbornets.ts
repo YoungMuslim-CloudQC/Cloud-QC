@@ -6,38 +6,7 @@ import { z } from "zod";
 
 import { assertAdmin } from "@/lib/authz";
 import { db } from "@/lib/db";
-
-const emptyToUndef = (v: unknown) =>
-  typeof v === "string" && v.trim() === "" ? undefined : v;
-
-const schema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(120),
-  city: z.preprocess(emptyToUndef, z.string().trim().max(120).optional()),
-  region: z.string().trim().min(1, "Region is required").max(80),
-  subArea: z.string().trim().min(1, "Sub-area is required").max(80),
-  stateCode: z.preprocess(
-    emptyToUndef,
-    z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[A-Z]{2}$/, "Use the 2-letter code")
-      .optional(),
-  ),
-  latitude: z.preprocess(
-    emptyToUndef,
-    z.coerce.number().min(-90).max(90).optional(),
-  ),
-  longitude: z.preprocess(
-    emptyToUndef,
-    z.coerce.number().min(-180).max(180).optional(),
-  ),
-  contactEmail: z.preprocess(
-    emptyToUndef,
-    z.string().trim().email("Not a valid email").optional(),
-  ),
-  instagram: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
-});
+import { neighbornetSchema as schema } from "@/lib/neighbornet-schema";
 
 export type NeighbornetFormState = {
   ok?: boolean;
@@ -77,8 +46,8 @@ export async function addNeighbornet(
       name: d.name,
       city: d.city ?? null,
       region: d.region,
-      subArea: d.subArea,
-      stateCode: d.stateCode ?? null,
+      subArea: d.subArea ?? null,
+      stateCode: d.stateCode,
       latitude: d.latitude ?? null,
       longitude: d.longitude ?? null,
       contactEmail: d.contactEmail ?? null,
@@ -120,8 +89,8 @@ export async function updateNeighbornet(
       name: d.name,
       city: d.city ?? null,
       region: d.region,
-      subArea: d.subArea,
-      stateCode: d.stateCode ?? null,
+      subArea: d.subArea ?? null,
+      stateCode: d.stateCode,
       latitude: d.latitude ?? null,
       longitude: d.longitude ?? null,
       contactEmail: d.contactEmail ?? null,

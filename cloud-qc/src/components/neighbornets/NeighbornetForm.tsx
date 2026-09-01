@@ -16,7 +16,7 @@ type Values = {
   name: string;
   city: string | null;
   region: string;
-  subArea: string;
+  subArea: string | null;
   stateCode: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -104,8 +104,8 @@ export function NeighbornetForm({
         <Field
           name="subArea"
           label="Sub-area"
+          optional="optional"
           placeholder="e.g. North New Jersey"
-          required
           defaultValue={initial?.subArea ?? ""}
           error={fe.subArea}
         />

@@ -129,8 +129,8 @@ model Neighbornet {
   name         String
   city         String?
   region       String
-  subArea      String
-  stateCode    String?   @db.Char(2)
+  subArea      String?
+  stateCode    String?   @db.Char(2) // always set on create/update; legacy rows may be null
   latitude     Decimal?  @db.Decimal(9, 6)
   longitude    Decimal?  @db.Decimal(9, 6)
   contactEmail String?
