@@ -1,10 +1,12 @@
+import Link from "next/link";
+
 import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
 
 // Every screen here is behind auth and renders live data.
 export const dynamic = "force-dynamic";
-import { initials } from "@/lib/format";
 import { CloudMark } from "@/components/Brand";
+import { Avatar } from "@/components/Avatar";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { SignOutButton } from "@/components/SignOutButton";
 
@@ -32,12 +34,12 @@ export default async function AppLayout({
           <div className="brand-sub">Young Muslim &middot; QC Ops</div>
         </div>
 
-        <div className="sidebar-user">
-          <div className="avatar-circle">{initials(displayName)}</div>
+        <Link href="/profile" className="sidebar-user">
+          <Avatar name={displayName} image={user.image} />
           <span style={{ fontSize: "12.5px", fontWeight: 600 }}>
             {displayName}
           </span>
-        </div>
+        </Link>
 
         <SidebarNav isAdmin={isAdmin} pendingCount={pendingCount} />
 

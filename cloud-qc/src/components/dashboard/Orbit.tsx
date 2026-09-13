@@ -22,7 +22,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
             y1={cy}
             x2={x}
             y2={y}
-            stroke="#332963"
+            stroke="var(--border)"
             strokeWidth={1.4}
           />
         );
@@ -31,8 +31,8 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
         cx={cx}
         cy={cy}
         r={30}
-        fill="#8B5CF6"
-        style={{ filter: "drop-shadow(0 0 10px rgba(139,92,246,0.7))" }}
+        fill="var(--primary)"
+        style={{ filter: "drop-shadow(0 0 10px rgba(var(--primary-rgb), 0.7))" }}
       />
       <text
         x={cx}
@@ -40,7 +40,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
         textAnchor="middle"
         fontFamily="var(--font-display), sans-serif"
         fontSize={11}
-        fill="#fff"
+        fill="var(--on-primary)"
         fontWeight={600}
       >
         Cloud
@@ -59,7 +59,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
               textAnchor="middle"
               fontFamily="var(--font-body), sans-serif"
               fontSize={9.5}
-              fill="#948CBB"
+              fill="var(--text-muted)"
             >
               {short}
             </text>

@@ -24,7 +24,7 @@ export type MapNeighbornet = {
 };
 
 
-const MUTED_PIN = "#948CBB";
+const MUTED_PIN = "var(--text-muted)";
 
 function hasCoords(n: MapNeighbornet): n is MapNeighbornet & {
   latitude: number;
@@ -173,8 +173,8 @@ function GeoMap({
       </defs>
       <path
         d={pathD}
-        fill="rgba(139,92,246,0.10)"
-        stroke="#8B5CF6"
+        fill="rgba(var(--primary-rgb), 0.10)"
+        stroke="var(--primary)"
         strokeWidth={2.2}
         filter="url(#stateGlow)"
       />
@@ -188,7 +188,7 @@ function GeoMap({
             key={`line-${p.id}`}
             d={`M ${p.x} ${p.y} L ${bendX} ${p.labelY} L ${p.labelX} ${p.labelY}`}
             fill="none"
-            stroke="#C9A227"
+            stroke="var(--gold)"
             strokeWidth={1.2}
             opacity={0.65}
           />
@@ -208,7 +208,7 @@ function GeoMap({
               cy={p.y}
               r={5}
               fill={c}
-              stroke="#170F32"
+              stroke="var(--surface)"
               strokeWidth={1.5}
               style={{ filter: `drop-shadow(0 0 6px ${c})` }}
             />
@@ -224,7 +224,7 @@ function GeoMap({
           fontFamily="var(--font-display), sans-serif"
           fontSize={13}
           fontWeight={600}
-          fill="#F5F3FF"
+          fill="var(--heading)"
           style={{ cursor: "pointer" }}
           onClick={() => onSelect(p)}
         >
@@ -255,7 +255,7 @@ function DetailPanel({
     <div>
       <div
         className="font-display"
-        style={{ fontWeight: 700, fontSize: 15, color: "#F5F3FF" }}
+        style={{ fontWeight: 700, fontSize: 15, color: "var(--heading)" }}
       >
         {n.name}
       </div>

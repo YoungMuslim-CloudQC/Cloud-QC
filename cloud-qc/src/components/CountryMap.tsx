@@ -109,11 +109,11 @@ export function CountryMap({
                       fill={
                         active
                           ? isHover
-                            ? "rgba(139,92,246,0.45)"
-                            : "rgba(139,92,246,0.22)"
-                          : "rgba(148,140,187,0.06)"
+                            ? "rgba(var(--primary-rgb), 0.45)"
+                            : "rgba(var(--primary-rgb), 0.22)"
+                          : "rgba(var(--text-rgb), 0.06)"
                       }
-                      stroke={active ? "#8B5CF6" : "#3A3363"}
+                      stroke={active ? "var(--primary)" : "var(--border)"}
                       strokeWidth={active ? 1.4 : 0.8}
                       style={{ cursor: active ? "pointer" : "default" }}
                       onMouseEnter={() =>
@@ -133,7 +133,7 @@ export function CountryMap({
             <div>
               <div
                 className="font-display"
-                style={{ fontWeight: 700, fontSize: 15, color: "#F5F3FF" }}
+                style={{ fontWeight: 700, fontSize: 15, color: "var(--heading)" }}
               >
                 {STATE_NAMES[hovered] ?? hovered}
               </div>

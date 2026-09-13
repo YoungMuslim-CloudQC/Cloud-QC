@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { initials } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
 import type { MemberStat } from "@/lib/queries";
 
 export function MemberList({
@@ -28,7 +28,7 @@ export function MemberList({
           className={`nn-select-item${m.id === activeId ? " active" : ""}`}
         >
           <div className="member-select-item">
-            <div className="avatar-circle">{initials(m.name)}</div>
+            <Avatar name={m.name} image={m.image} />
             <div>
               <div className="nsi-name">{m.name}</div>
               <div className="nsi-city">

@@ -139,19 +139,19 @@ export function LocationPicker({
           >
             <path
               d={pathD}
-              fill="rgba(139,92,246,0.10)"
-              stroke="#8B5CF6"
+              fill="rgba(var(--primary-rgb), 0.10)"
+              stroke="var(--primary)"
               strokeWidth={2}
             />
             {marker && (
               <>
-                <circle cx={marker[0]} cy={marker[1]} r={9} fill="#38BDF8" opacity={0.25} />
+                <circle cx={marker[0]} cy={marker[1]} r={9} fill="var(--secondary)" opacity={0.25} />
                 <circle
                   cx={marker[0]}
                   cy={marker[1]}
                   r={5}
-                  fill="#38BDF8"
-                  stroke="#170F32"
+                  fill="var(--secondary)"
+                  stroke="var(--surface)"
                   strokeWidth={1.5}
                 />
               </>

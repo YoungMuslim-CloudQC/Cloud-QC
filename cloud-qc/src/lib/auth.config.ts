@@ -72,10 +72,16 @@ export default {
           | "PENDING"
           | "APPROVED"
           | "REJECTED";
+        token.theme = (user as { theme?: string | null }).theme ?? "default";
       }
       if (trigger === "update" && session?.user) {
-        token.role = session.user.role;
-        token.status = session.user.status;
+        // A caller may pass a *partial* user (the profile page only ever
+        // sends { theme }) — only overwrite fields that are actually
+        // present, or an unrelated update would blank out role/status and
+        // bounce the user to /pending.
+        if (session.user.role) token.role = session.user.role;
+        if (session.user.status) token.status = session.user.status;
+        if (session.user.theme) token.theme = session.user.theme;
       }
       return token;
     },
@@ -87,6 +93,7 @@ export default {
           | "PENDING"
           | "APPROVED"
           | "REJECTED";
+        session.user.theme = (token.theme as string) ?? "default";
       }
       return session;
     },

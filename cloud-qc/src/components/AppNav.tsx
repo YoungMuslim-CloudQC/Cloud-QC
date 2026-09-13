@@ -13,6 +13,7 @@ type NavKey =
   | "map"
   | "team"
   | "rotation"
+  | "profile"
   | "admin";
 
 type NavDef = {
@@ -103,6 +104,18 @@ const NAV: NavDef[] = [
       <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
         <path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M18 3v4h-4M6 21v-4h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "profile",
+    href: "/profile",
+    label: "Profile",
+    short: "Profile",
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M4.5 20c0-4.1 3.4-7 7.5-7s7.5 2.9 7.5 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     ),
   },

@@ -44,6 +44,21 @@ enum VisitHistoryAction {
   RESTORED
 }
 
+// Digest sending itself (email/SMS) is a later pass — these fields only
+// capture what a user has asked for.
+enum DigestCadence {
+  OFF
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  BOTH
+}
+
 // ---------------------------------------------------------------------------
 // Auth & people
 // Prototype had separate `users` and `members`; here an approved User *is* a
@@ -55,12 +70,21 @@ model User {
   email         String        @unique
   emailVerified DateTime?
   name          String?
-  image         String?
+  image         String? // OAuth avatar URL, or a Vercel Blob URL once the user uploads their own photo
   passwordHash  String? // null for OAuth-only accounts
   role          Role          @default(MEMBER)
   status        AccountStatus @default(PENDING)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  // --- Profile / preferences (self-service, set from /profile) ---
+  phone               String?
+  theme               String?             @default("default")
+  digestCadence       DigestCadence       @default(OFF)
+  notificationChannel NotificationChannel @default(EMAIL)
+  smsConsent          Boolean             @default(false)
+  smsConsentAt        DateTime?
+  lastDigestSentAt    DateTime? // when their most recent digest email actually went out
 
   accounts            Account[]
   sessions            Session[]

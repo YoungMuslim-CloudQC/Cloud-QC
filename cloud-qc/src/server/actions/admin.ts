@@ -2,9 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { put } from "@vercel/blob";
 
 import { assertAdmin } from "@/lib/authz";
 import { db } from "@/lib/db";
+import {
+  adminProfileSchema,
+  MAX_PHOTO_BYTES,
+  ALLOWED_PHOTO_TYPES,
+} from "@/lib/profile-schema";
 
 const idSchema = z.object({ userId: z.string().min(1) });
 
@@ -41,4 +47,63 @@ export async function setUserRole(formData: FormData) {
 
   await db.user.update({ where: { id: userId }, data: { role } });
   revalidatePath("/admin");
+}
+
+export type AdminProfileState = { ok?: boolean; error?: string };
+
+/** Admin edits another user's name/phone/photo. Deliberately does not touch
+ *  theme, digest cadence, notification channel, or SMS consent — those are
+ *  personal preferences (consent especially) that must come from the user
+ *  themselves, not be set on their behalf. */
+export async function adminUpdateMemberProfile(
+  _prev: AdminProfileState,
+  formData: FormData,
+): Promise<AdminProfileState> {
+  await assertAdmin();
+
+  const parsed = adminProfileSchema.safeParse({
+    userId: formData.get("userId"),
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  const d = parsed.data;
+
+  const photo = formData.get("photo");
+  let imageUrl: string | undefined;
+  if (photo instanceof File && photo.size > 0) {
+    if (!ALLOWED_PHOTO_TYPES.includes(photo.type)) {
+      return { ok: false, error: "Photo must be JPG, PNG, or WEBP." };
+    }
+    if (photo.size > MAX_PHOTO_BYTES) {
+      return { ok: false, error: "Photo must be under 5MB." };
+    }
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return {
+        ok: false,
+        error: "Photo uploads aren't configured yet — set up Vercel Blob first.",
+      };
+    }
+    const blob = await put(`profile-photos/${d.userId}-${Date.now()}`, photo, {
+      access: "public",
+      contentType: photo.type,
+    });
+    imageUrl = blob.url;
+  }
+
+  await db.user.update({
+    where: { id: d.userId },
+    data: {
+      name: d.name,
+      phone: d.phone ?? null,
+      ...(imageUrl ? { image: imageUrl } : {}),
+    },
+  });
+
+  revalidatePath(`/team/${d.userId}`);
+  revalidatePath("/team");
+  revalidatePath("/", "layout");
+  return { ok: true };
 }

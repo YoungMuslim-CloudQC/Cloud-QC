@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamMemberPage({
   params,
 }: PageProps<"/team/[id]">) {
-  await requireApproved();
+  const me = await requireApproved();
   const { id } = await params;
   const members = await getTeamMemberStats();
 
@@ -29,7 +29,7 @@ export default async function TeamMemberPage({
           <MemberList members={members} activeId={id} />
         </div>
         <div className="card">
-          <MemberDetail id={id} />
+          <MemberDetail id={id} isAdmin={me.role === "ADMIN"} />
         </div>
       </div>
     </>

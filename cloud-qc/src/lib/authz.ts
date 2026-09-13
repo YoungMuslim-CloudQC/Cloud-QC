@@ -11,6 +11,7 @@ export type SessionUser = {
   image?: string | null;
   role: "MEMBER" | "ADMIN";
   status: "PENDING" | "APPROVED" | "REJECTED";
+  theme: string;
 };
 
 /** Returns the session user or `null`. Never redirects. */

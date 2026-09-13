@@ -14,6 +14,11 @@ export default auth((req) => {
   const session = req.auth;
   const path = nextUrl.pathname;
 
+  // Cron routes carry their own CRON_SECRET check (Vercel Cron calls them
+  // with no session cookie at all — a redirect-to-login here would silently
+  // break every scheduled run).
+  if (path.startsWith("/api/cron/")) return NextResponse.next();
+
   const isPublic = PUBLIC_PATHS.some(
     (p) => path === p || path.startsWith(`${p}/`),
   );

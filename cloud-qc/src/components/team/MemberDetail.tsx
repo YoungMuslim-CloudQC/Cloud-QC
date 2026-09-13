@@ -3,13 +3,28 @@ import { notFound } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { memberName } from "@/lib/queries";
-import { initials, isoDate } from "@/lib/format";
+import { isoDate } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
 import { FeedbackSentToggle } from "@/components/neighbornets/FeedbackSentToggle";
+import { AdminEditMemberProfile } from "@/components/team/AdminEditMemberProfile";
 
-export async function MemberDetail({ id }: { id: string }) {
+export async function MemberDetail({
+  id,
+  isAdmin = false,
+}: {
+  id: string;
+  isAdmin?: boolean;
+}) {
   const member = await db.user.findUnique({
     where: { id },
-    select: { id: true, name: true, email: true, status: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      status: true,
+      image: true,
+      phone: true,
+    },
   });
   if (!member || member.status !== "APPROVED") notFound();
 
@@ -32,13 +47,22 @@ export async function MemberDetail({ id }: { id: string }) {
     <>
       <div className="section-label">
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="avatar-circle">{initials(name)}</span>
+          <Avatar name={name} image={member.image} />
           {name}
         </span>
         <span className="badge badge-neutral">
           {participations.filter((p) => !p.visit.feedbackSent).length} pending
         </span>
       </div>
+
+      {isAdmin && (
+        <AdminEditMemberProfile
+          userId={member.id}
+          name={name}
+          image={member.image}
+          phone={member.phone}
+        />
+      )}
 
       <div
         className="stat-grid"

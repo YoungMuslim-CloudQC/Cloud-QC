@@ -6,12 +6,29 @@
    --font-display / --font-body / --font-mono are set on <html>.
    =========================================================================== */
 
+/* ===========================================================================
+   THEME PALETTES
+   :root is "Nebula", the original/default look. [data-theme="default"] below
+   restates the same values explicitly (rather than just relying on :root) —
+   both target <html>, so without that, an element that scopes its own
+   preview via [data-theme] (see the swatches on /profile) would inherit
+   whatever theme is *currently active* on <html> instead of true default.
+   Each alternate palette is a full copy of every token that should vary by
+   theme; --gold/--success/--warn/--urgent/--radius are semantic/structural
+   and stay constant across all of them on purpose (status colors need to
+   stay recognizable no matter which skin is active).
+
+   --*-rgb tokens exist so rgba(var(--x-rgb), alpha) glows/shadows recolor
+   along with the palette instead of staying hardcoded to Nebula's purple/cyan.
+   =========================================================================== */
 :root {
   --bg: #0d0821;
   --surface: #170f32;
   --surface-2: #1e1442;
   --primary: #8b5cf6;
   --primary-dim: #7c3aed;
+  --primary-bright: #9d74f8;
+  --primary-deep: #6d28d9;
   --secondary: #38bdf8;
   --accent: #f0abfc;
   --gold: #fbbf24;
@@ -26,6 +43,285 @@
   --urgent: #fb7185;
   --urgent-bg: rgba(251, 113, 133, 0.16);
   --radius: 10px;
+  --scheme: dark; /* flips to "light" only in [data-theme="paper"] */
+
+  --sidebar-grad-1: #150c31;
+  --sidebar-grad-2: #0f0a26;
+  --sidebar-text: #dcd5f5;
+  --heading: #f5f3ff;
+  --on-primary: #fff;
+  --on-accent: #2a1145;
+  --placeholder: #5f5789;
+  --text-gradient-1: #c4b5fd;
+  --text-gradient-2: #67e8f9;
+
+  --primary-rgb: 139, 92, 246;
+  --secondary-rgb: 56, 189, 248;
+  --accent-rgb: 240, 171, 252;
+  --text-rgb: 237, 233, 254;
+}
+
+/* Nebula, restated explicitly — see note above. */
+[data-theme="default"] {
+  --scheme: dark;
+  --bg: #0d0821;
+  --surface: #170f32;
+  --surface-2: #1e1442;
+  --primary: #8b5cf6;
+  --primary-dim: #7c3aed;
+  --primary-bright: #9d74f8;
+  --primary-deep: #6d28d9;
+  --secondary: #38bdf8;
+  --accent: #f0abfc;
+  --text: #ede9fe;
+  --text-muted: #948cbb;
+  --border: #2c2258;
+  --border-soft: #241b4a;
+
+  --sidebar-grad-1: #150c31;
+  --sidebar-grad-2: #0f0a26;
+  --sidebar-text: #dcd5f5;
+  --heading: #f5f3ff;
+  --on-accent: #2a1145;
+  --placeholder: #5f5789;
+  --text-gradient-1: #c4b5fd;
+  --text-gradient-2: #67e8f9;
+
+  --primary-rgb: 139, 92, 246;
+  --secondary-rgb: 56, 189, 248;
+  --accent-rgb: 240, 171, 252;
+  --text-rgb: 237, 233, 254;
+}
+
+/* Aurora — teal & emerald on a deep sea-green black. */
+[data-theme="aurora"] {
+  --bg: #061615;
+  --surface: #0d211f;
+  --surface-2: #122d2a;
+  --primary: #2dd4bf;
+  --primary-dim: #14b8a6;
+  --primary-bright: #5eead4;
+  --primary-deep: #0f766e;
+  --secondary: #4ade80;
+  --accent: #a7f3d0;
+  --text: #e6fbf6;
+  --text-muted: #7fa89f;
+  --border: #1c3a36;
+  --border-soft: #16302c;
+
+  --sidebar-grad-1: #0a1f1d;
+  --sidebar-grad-2: #061513;
+  --sidebar-text: #cdeee7;
+  --heading: #f0fdfa;
+  --on-accent: #05261f;
+  --placeholder: #4d6f68;
+  --text-gradient-1: #5eead4;
+  --text-gradient-2: #86efac;
+
+  --primary-rgb: 45, 212, 191;
+  --secondary-rgb: 74, 222, 128;
+  --accent-rgb: 167, 243, 208;
+  --text-rgb: 230, 251, 246;
+}
+
+/* Sepia — tan & brown on a warm dark background. Paper's dark, "aged
+   paper at night" counterpart — muted rather than vibrant on purpose. */
+[data-theme="sepia"] {
+  --bg: #1a1410;
+  --surface: #241c15;
+  --surface-2: #2e251a;
+  --primary: #d4a373;
+  --primary-dim: #c08552;
+  --primary-bright: #e6c19c;
+  --primary-deep: #8b5e34;
+  --secondary: #c9a66b;
+  --accent: #f0dfc0;
+  --text: #ecdfd0;
+  --text-muted: #a08d76;
+  --border: #3a2f22;
+  --border-soft: #2c2318;
+
+  --sidebar-grad-1: #14100c;
+  --sidebar-grad-2: #0a0806;
+  --sidebar-text: #d9c9b0;
+  --heading: #f5ead9;
+  --on-accent: #2c1f0f;
+  --placeholder: #6b5c48;
+  --text-gradient-1: #e6c19c;
+  --text-gradient-2: #d4a373;
+
+  --primary-rgb: 212, 163, 115;
+  --secondary-rgb: 201, 166, 107;
+  --accent-rgb: 240, 223, 192;
+  --text-rgb: 236, 223, 208;
+}
+
+/* Nocturne — blue & violet on a deep steel-blue black. */
+[data-theme="nocturne"] {
+  --bg: #060a18;
+  --surface: #0d1526;
+  --surface-2: #131d33;
+  --primary: #60a5fa;
+  --primary-dim: #3b82f6;
+  --primary-bright: #93c5fd;
+  --primary-deep: #1d4ed8;
+  --secondary: #a78bfa;
+  --accent: #7dd3fc;
+  --text: #e8eefc;
+  --text-muted: #7e8cad;
+  --border: #1f2b47;
+  --border-soft: #182238;
+
+  --sidebar-grad-1: #0a1122;
+  --sidebar-grad-2: #060a16;
+  --sidebar-text: #cbd7f5;
+  --heading: #f4f7ff;
+  --on-accent: #0b1a2e;
+  --placeholder: #566487;
+  --text-gradient-1: #93c5fd;
+  --text-gradient-2: #a78bfa;
+
+  --primary-rgb: 96, 165, 250;
+  --secondary-rgb: 167, 139, 250;
+  --accent-rgb: 125, 211, 252;
+  --text-rgb: 232, 238, 252;
+}
+
+/* Crimson — red & orange on a deep near-black red. */
+[data-theme="crimson"] {
+  --bg: #170808;
+  --surface: #241010;
+  --surface-2: #2e1515;
+  --primary: #f87171;
+  --primary-dim: #ef4444;
+  --primary-bright: #fca5a5;
+  --primary-deep: #b91c1c;
+  --secondary: #fb923c;
+  --accent: #fde68a;
+  --text: #fdecec;
+  --text-muted: #b08585;
+  --border: #3a1a1a;
+  --border-soft: #2c1313;
+
+  --sidebar-grad-1: #200c0c;
+  --sidebar-grad-2: #170707;
+  --sidebar-text: #f0d5d5;
+  --heading: #fff5f5;
+  --on-accent: #3a2408;
+  --placeholder: #7a5252;
+  --text-gradient-1: #fca5a5;
+  --text-gradient-2: #fb923c;
+
+  --primary-rgb: 248, 113, 113;
+  --secondary-rgb: 251, 146, 60;
+  --accent-rgb: 253, 230, 138;
+  --text-rgb: 253, 236, 236;
+}
+
+/* Paper — plain white, easy on the eyes. The one fully light theme, sidebar
+   included: --sidebar-grad-1/2 are light here (every other theme keeps them
+   dark) and .nav-item/.sidebar-user/.btn-logout hover-active text uses
+   var(--heading) rather than var(--on-primary) specifically so it stays
+   dark-on-light here instead of vanishing (see those rules below). --scheme
+   flips native form control chrome (see `select { color-scheme: var(--scheme)
+   }` below). */
+[data-theme="paper"] {
+  --scheme: light;
+  --bg: #f5f5f8;
+  --surface: #ffffff;
+  --surface-2: #eef0f4;
+  --primary: #334155;
+  --primary-dim: #1e293b;
+  --primary-bright: #64748b;
+  --primary-deep: #0f172a;
+  --secondary: #475569;
+  --accent: #94a3b8;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --border: #e4e4e7;
+  --border-soft: #ececef;
+
+  --sidebar-grad-1: #ffffff;
+  --sidebar-grad-2: #f1f1f5;
+  --sidebar-text: #52525b;
+  --heading: #09090b;
+  --on-accent: #0f172a;
+  --placeholder: #a1a1aa;
+  --text-gradient-1: #334155;
+  --text-gradient-2: #64748b;
+
+  --primary-rgb: 51, 65, 85;
+  --secondary-rgb: 71, 85, 105;
+  --accent-rgb: 148, 163, 184;
+  --text-rgb: 24, 24, 27;
+}
+
+/* Citrus — lime & yellow on a deep olive black. */
+[data-theme="citrus"] {
+  --bg: #0f1408;
+  --surface: #182010;
+  --surface-2: #202b15;
+  --primary: #a3e635;
+  --primary-dim: #84cc16;
+  --primary-bright: #bef264;
+  --primary-deep: #4d7c0f;
+  --secondary: #fde047;
+  --accent: #ecfccb;
+  --text: #f3fce3;
+  --text-muted: #8fa870;
+  --border: #2c3a1c;
+  --border-soft: #202c14;
+
+  --sidebar-grad-1: #131a0b;
+  --sidebar-grad-2: #0d1207;
+  --sidebar-text: #dcecc5;
+  --heading: #f8ffe8;
+  --on-accent: #1e2a08;
+  --placeholder: #5c6d47;
+  --text-gradient-1: #bef264;
+  --text-gradient-2: #fde047;
+
+  --primary-rgb: 163, 230, 53;
+  --secondary-rgb: 253, 224, 71;
+  --accent-rgb: 236, 252, 203;
+  --text-rgb: 243, 252, 227;
+}
+
+/* Onyx — plain black & gray, no strong hue. For "just make it simple". */
+[data-theme="onyx"] {
+  --bg: #050505;
+  --surface: #121212;
+  --surface-2: #1c1c1c;
+  --primary: #a1a1aa;
+  --primary-dim: #71717a;
+  --primary-bright: #d4d4d8;
+  --primary-deep: #52525b;
+  --secondary: #d4d4d8;
+  --accent: #e4e4e7;
+  --text: #e4e4e7;
+  --text-muted: #71717a;
+  --border: #27272a;
+  --border-soft: #1c1c1e;
+
+  --sidebar-grad-1: #0a0a0a;
+  --sidebar-grad-2: #000000;
+  --sidebar-text: #d4d4d8;
+  --heading: #fafafa;
+  --on-accent: #18181b;
+  --placeholder: #52525b;
+  --text-gradient-1: #d4d4d8;
+  --text-gradient-2: #a1a1aa;
+
+  --primary-rgb: 161, 161, 170;
+  --secondary-rgb: 212, 212, 216;
+  --accent-rgb: 228, 228, 231;
+  --text-rgb: 228, 228, 231;
+}
+
+html {
+  /* Native form-control chrome (checkboxes, date pickers, scrollbars)
+     follows the active theme instead of always assuming dark. */
+  color-scheme: var(--scheme);
 }
 
 * {
@@ -42,17 +338,17 @@ body {
   background:
     radial-gradient(
       ellipse 700px 400px at 12% 8%,
-      rgba(139, 92, 246, 0.16),
+      rgba(var(--primary-rgb), 0.16),
       transparent 60%
     ),
     radial-gradient(
       ellipse 600px 500px at 88% 20%,
-      rgba(56, 189, 248, 0.1),
+      rgba(var(--secondary-rgb), 0.1),
       transparent 55%
     ),
     radial-gradient(
       ellipse 800px 600px at 50% 100%,
-      rgba(240, 171, 252, 0.06),
+      rgba(var(--accent-rgb), 0.06),
       transparent 60%
     ),
     var(--bg);
@@ -71,16 +367,16 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(1.5px 1.5px at 20px 30px, rgba(237, 233, 254, 0.5), transparent),
-    radial-gradient(1px 1px at 140px 90px, rgba(237, 233, 254, 0.4), transparent),
-    radial-gradient(1.5px 1.5px at 260px 200px, rgba(237, 233, 254, 0.35), transparent),
-    radial-gradient(1px 1px at 340px 60px, rgba(237, 233, 254, 0.3), transparent),
-    radial-gradient(1.5px 1.5px at 400px 300px, rgba(237, 233, 254, 0.4), transparent),
-    radial-gradient(1px 1px at 500px 150px, rgba(237, 233, 254, 0.3), transparent),
-    radial-gradient(1.5px 1.5px at 600px 400px, rgba(237, 233, 254, 0.35), transparent),
-    radial-gradient(1px 1px at 700px 80px, rgba(237, 233, 254, 0.3), transparent),
-    radial-gradient(1.5px 1.5px at 90px 450px, rgba(237, 233, 254, 0.4), transparent),
-    radial-gradient(1px 1px at 800px 500px, rgba(237, 233, 254, 0.3), transparent);
+    radial-gradient(1.5px 1.5px at 20px 30px, rgba(var(--text-rgb), 0.5), transparent),
+    radial-gradient(1px 1px at 140px 90px, rgba(var(--text-rgb), 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 260px 200px, rgba(var(--text-rgb), 0.35), transparent),
+    radial-gradient(1px 1px at 340px 60px, rgba(var(--text-rgb), 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 400px 300px, rgba(var(--text-rgb), 0.4), transparent),
+    radial-gradient(1px 1px at 500px 150px, rgba(var(--text-rgb), 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 600px 400px, rgba(var(--text-rgb), 0.35), transparent),
+    radial-gradient(1px 1px at 700px 80px, rgba(var(--text-rgb), 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 90px 450px, rgba(var(--text-rgb), 0.4), transparent),
+    radial-gradient(1px 1px at 800px 500px, rgba(var(--text-rgb), 0.3), transparent);
   background-repeat: repeat;
   background-size: 850px 550px;
   opacity: 0.6;
@@ -132,7 +428,7 @@ button {
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
-  background: linear-gradient(90deg, #c4b5fd, #67e8f9);
+  background: linear-gradient(90deg, var(--text-gradient-1), var(--text-gradient-2));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -163,7 +459,7 @@ button {
 }
 .auth-tab.active {
   background: var(--primary-dim);
-  color: #fff;
+  color: var(--on-primary);
 }
 .auth-msg {
   font-size: 12px;
@@ -227,9 +523,9 @@ button {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #150c31 0%, #0f0a26 100%);
+  background: linear-gradient(180deg, var(--sidebar-grad-1) 0%, var(--sidebar-grad-2) 100%);
   border-right: 1px solid var(--border-soft);
-  color: #dcd5f5;
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   padding: 24px 0;
@@ -247,7 +543,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(90deg, #c4b5fd, #67e8f9);
+  background: linear-gradient(90deg, var(--text-gradient-1), var(--text-gradient-2));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -272,12 +568,15 @@ button {
   text-decoration: none;
 }
 .nav-item:hover {
-  color: #fff;
-  background: rgba(139, 92, 246, 0.08);
+  /* var(--heading), not var(--on-primary): this sits on the sidebar, which
+     is dark in every theme except Paper — on-primary is always white and
+     would vanish there. */
+  color: var(--heading);
+  background: rgba(var(--primary-rgb), 0.08);
 }
 .nav-item.active {
-  color: #fff;
-  background: rgba(139, 92, 246, 0.14);
+  color: var(--heading);
+  background: rgba(var(--primary-rgb), 0.14);
   border-left-color: var(--accent);
 }
 .nav-icon {
@@ -289,7 +588,7 @@ button {
 .nav-admin-tag {
   font-size: 9px;
   background: var(--gold);
-  color: #2a1145;
+  color: var(--on-accent);
   padding: 1px 5px;
   border-radius: 100px;
   font-weight: 700;
@@ -308,6 +607,11 @@ button {
   align-items: center;
   gap: 8px;
   padding: 0 20px 14px 20px;
+  text-decoration: none;
+  color: inherit;
+}
+.sidebar-user:hover {
+  color: var(--heading);
 }
 .btn-logout {
   background: none;
@@ -319,7 +623,7 @@ button {
   margin: 0 20px 14px 20px;
 }
 .btn-logout:hover {
-  color: #fff;
+  color: var(--heading);
   border-color: var(--secondary);
 }
 
@@ -336,7 +640,7 @@ button {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #f5f3ff;
+  color: var(--heading);
 }
 .page-desc {
   color: var(--text-muted);
@@ -380,7 +684,7 @@ button {
   font-size: 26px;
   font-weight: 500;
   margin-top: 6px;
-  background: linear-gradient(90deg, #c4b5fd, #93e7fa);
+  background: linear-gradient(90deg, var(--text-gradient-1), var(--text-gradient-2));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -394,7 +698,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #f0edff;
+  color: var(--heading);
 }
 .card {
   background: var(--surface);
@@ -434,7 +738,7 @@ button {
 }
 .nn-card:hover {
   border-color: var(--secondary);
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 1px rgba(var(--secondary-rgb), 0.25);
 }
 .nn-card-top {
   display: flex;
@@ -444,7 +748,7 @@ button {
 .nn-name {
   font-weight: 600;
   font-size: 14px;
-  color: #f5f3ff;
+  color: var(--heading);
 }
 .nn-city {
   color: var(--text-muted);
@@ -506,7 +810,7 @@ button {
 }
 .visit-nn {
   font-weight: 500;
-  color: #f0edff;
+  color: var(--heading);
 }
 .visit-sub {
   color: var(--text-muted);
@@ -526,7 +830,7 @@ button {
 }
 .empty-state strong {
   display: block;
-  color: #f0edff;
+  color: var(--heading);
   font-family: var(--font-display), "Space Grotesk", sans-serif;
   font-size: 15px;
   margin-bottom: 6px;
@@ -549,7 +853,7 @@ button {
 label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #dcd5f5;
+  color: var(--sidebar-text);
 }
 .optional-tag {
   font-weight: 400;
@@ -575,7 +879,7 @@ textarea {
 }
 input::placeholder,
 textarea::placeholder {
-  color: #5f5789;
+  color: var(--placeholder);
 }
 input:focus,
 select:focus,
@@ -590,7 +894,7 @@ textarea {
   font-family: var(--font-body), "Inter", sans-serif;
 }
 select {
-  color-scheme: dark;
+  color-scheme: var(--scheme);
 }
 .field-error {
   color: var(--urgent);
@@ -623,7 +927,7 @@ select {
 .star.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #2a1145;
+  color: var(--on-accent);
 }
 
 .status-options {
@@ -669,15 +973,15 @@ select {
   cursor: not-allowed;
 }
 .btn-primary {
-  background: linear-gradient(90deg, var(--primary-dim), #6d28d9);
-  color: #fff;
+  background: linear-gradient(90deg, var(--primary-dim), var(--primary-deep));
+  color: var(--on-primary);
   box-shadow:
-    0 0 0 1px rgba(139, 92, 246, 0.3),
-    0 4px 16px rgba(139, 92, 246, 0.25);
+    0 0 0 1px rgba(var(--primary-rgb), 0.3),
+    0 4px 16px rgba(var(--primary-rgb), 0.25);
   width: 100%;
 }
 .btn-primary:hover {
-  background: linear-gradient(90deg, #9d74f8, var(--primary-dim));
+  background: linear-gradient(90deg, var(--primary-bright), var(--primary-dim));
 }
 .btn-secondary {
   background: var(--surface-2);
@@ -720,13 +1024,13 @@ select {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: linear-gradient(90deg, var(--primary-dim), #6d28d9);
-  color: #fff;
+  background: linear-gradient(90deg, var(--primary-dim), var(--primary-deep));
+  color: var(--on-primary);
   padding: 12px 18px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
-  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 8px 30px rgba(var(--primary-rgb), 0.4);
   opacity: 0;
   transform: translateY(8px);
   transition: all 0.25s ease;
@@ -789,7 +1093,7 @@ select {
 }
 .nn-select-item .nsi-name {
   font-weight: 600;
-  color: #f0edff;
+  color: var(--heading);
 }
 .nn-select-item .nsi-city {
   color: var(--text-muted);
@@ -834,8 +1138,11 @@ tr:last-child td {
   font-family: var(--font-display), "Space Grotesk", sans-serif;
   font-weight: 700;
   font-size: 13px;
-  color: #fff;
+  color: var(--on-primary);
   flex-shrink: 0;
+}
+.avatar-photo {
+  object-fit: cover;
 }
 .member-select-item {
   display: flex;
@@ -963,7 +1270,7 @@ tr:last-child td {
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--primary-rgb), 0.18), transparent 70%);
 }
 .region-card:nth-child(2n) {
   border-radius: 12px 34px 14px 30px;
@@ -1034,13 +1341,13 @@ tr:last-child td {
 }
 .view-toggle-btn.active {
   background: var(--primary-dim);
-  color: #fff;
+  color: var(--on-primary);
 }
 .region-title {
   font-family: var(--font-display), "Space Grotesk", sans-serif;
   font-weight: 700;
   font-size: 16px;
-  color: #f5f3ff;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1105,6 +1412,113 @@ tr:last-child td {
   border-bottom: none;
 }
 
+/* ================= PROFILE PAGE ================= */
+.profile-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.profile-photo-row .avatar-circle {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+.profile-photo-row input[type="file"] {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toggle-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.toggle-option input {
+  margin-top: 2px;
+}
+.toggle-option-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.toggle-option-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.toggle-option.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.theme-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  text-align: left;
+}
+.theme-swatch.active {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 1px var(--secondary);
+}
+.theme-swatch-preview {
+  height: 28px;
+  border-radius: 6px;
+}
+.theme-swatch-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--heading);
+}
+.theme-swatch-blurb {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+
+/* A visibly-lighter nested box — used where a section's content reacts to
+   an earlier choice on the page, so the reader can see it's "live". */
+.subpanel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 10px 0 16px 0;
+}
+
+.tag-construction {
+  display: inline-block;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 100px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  margin-left: 8px;
+}
+
 /* ================= MOBILE BOTTOM NAV + SHEETS ================= */
 .bottom-tab-bar {
   display: none;
@@ -1126,7 +1540,7 @@ tr:last-child td {
   text-decoration: none;
 }
 .bottom-tab-item.active {
-  color: #fff;
+  color: var(--heading);
 }
 .bottom-tab-item svg {
   width: 20px;
@@ -1243,7 +1657,7 @@ tr:last-child td {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, #150c31 0%, #0f0a26 100%);
+    background: linear-gradient(180deg, var(--sidebar-grad-1) 0%, var(--sidebar-grad-2) 100%);
     border-top: 1px solid var(--border-soft);
     z-index: 50;
     padding-bottom: env(safe-area-inset-bottom, 0px);

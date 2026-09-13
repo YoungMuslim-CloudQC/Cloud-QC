@@ -169,6 +169,7 @@ export type MemberStat = {
   id: string;
   name: string;
   email: string | null;
+  image: string | null;
   role: "MEMBER" | "ADMIN";
   visitCount: number;
   distinctNeighbornets: number;
@@ -183,7 +184,7 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
     db.user.findMany({
       where: { status: "APPROVED" },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, image: true, role: true },
     }),
     db.visitParticipant.findMany({
       where: { visit: { deletedAt: null } },
@@ -215,6 +216,7 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
       id: m.id,
       name: memberName(m),
       email: m.email,
+      image: m.image,
       role: m.role,
       visitCount: rows.length,
       distinctNeighbornets: nnSet.size,
