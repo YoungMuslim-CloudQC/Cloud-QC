@@ -1,6 +1,6 @@
 "use server";
 
-import { assertApproved } from "@/lib/authz";
+import { assertAdmin } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { buildDigestContent, digestEmailHtml } from "@/lib/digest";
 import { sendDigestEmail } from "@/lib/resend";
@@ -8,14 +8,16 @@ import { memberName } from "@/lib/queries";
 
 export type TestDigestState = { ok?: boolean; error?: string };
 
-/** Sends the caller a one-off copy of their own digest right now, regardless
- *  of cadence/due-ness. Does NOT touch lastDigestSentAt — this is purely for
- *  eyeballing the formatting, not a real scheduled send. */
+/** Admin-only: sends the caller a one-off copy of their own digest right
+ *  now, regardless of cadence/due-ness, for eyeballing the formatting.
+ *  Does NOT touch lastDigestSentAt. Not exposed to regular members — they
+ *  already get an immediate digest the moment they turn on a cadence (see
+ *  updateProfile), so there's nothing for them to manually trigger. */
 export async function sendTestDigestToSelf(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState's required shape; this action ignores prior state and form input
   _prev: TestDigestState,
 ): Promise<TestDigestState> {
-  const me = await assertApproved();
+  const me = await assertAdmin();
   const user = await db.user.findUniqueOrThrow({
     where: { id: me.id },
     select: {

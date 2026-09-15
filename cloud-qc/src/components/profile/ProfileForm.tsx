@@ -12,11 +12,28 @@ const INITIAL: ProfileState = {};
 type Cadence = "OFF" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
 type Channel = "EMAIL" | "SMS" | "BOTH";
 
-const CHANNEL_DIGEST_NOTE: Record<Channel, string> = {
-  EMAIL: "Sent to your account email.",
-  SMS: "Will be sent by text once SMS notifications are live — email in the meantime.",
-  BOTH: "Sent by email now; text will join once SMS notifications are live.",
+const CADENCE_LABEL: Record<"WEEKLY" | "BIWEEKLY" | "MONTHLY", string> = {
+  WEEKLY: "every week",
+  BIWEEKLY: "every two weeks",
+  MONTHLY: "every month",
 };
+
+/** `isNewSelection`: true when this cadence differs from what's already
+ *  saved — matches updateProfile's own "send one now" condition, so the
+ *  copy here doesn't promise something the save won't actually do. */
+function digestNote(cadence: Cadence, channel: Channel, isNewSelection: boolean): string {
+  if (cadence === "OFF") return "No digest emails.";
+  const how =
+    channel === "EMAIL"
+      ? "by email"
+      : channel === "SMS"
+        ? "by text once SMS notifications are live — by email in the meantime"
+        : "by email now, and by text too once SMS notifications are live";
+  const lead = isNewSelection
+    ? "You'll get one right away (unless you've had one in the last 24 hours), then "
+    : "Sent ";
+  return `${lead}${CADENCE_LABEL[cadence]} ${how}.`;
+}
 
 function applyThemePreview(theme: ThemeKey) {
   document.documentElement.dataset.theme = theme;
@@ -199,9 +216,7 @@ export function ProfileForm({
             ))}
           </div>
           <div className="survey-time-note" style={{ marginTop: 10 }}>
-            {cadence === "OFF"
-              ? "No digest emails. Sending isn't turned on yet either way — this just saves your preference."
-              : CHANNEL_DIGEST_NOTE[effectiveChannel]}
+            {digestNote(cadence, effectiveChannel, cadence !== digestCadence)}
           </div>
         </div>
       </div>

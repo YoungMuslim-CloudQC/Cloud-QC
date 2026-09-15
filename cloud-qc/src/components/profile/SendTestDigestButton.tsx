@@ -14,11 +14,13 @@ export function SendTestDigestButton() {
   return (
     <form action={formAction} className="subpanel" style={{ marginTop: 20 }}>
       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
-        Test the digest
+        Test the digest <span className="tag-construction">Admin</span>
       </div>
       <div className="survey-time-note" style={{ marginBottom: 10 }}>
         Sends a one-off copy of what your digest looks like to your own email
-        right now — doesn&rsquo;t affect your real schedule.
+        right now — doesn&rsquo;t affect your real schedule. Regular members
+        don&rsquo;t see this: they get an immediate digest the moment they
+        turn on a cadence instead.
       </div>
       {state.error && <div className="auth-msg error">{state.error}</div>}
       {state.ok && <div className="auth-msg info">Sent — check your inbox.</div>}

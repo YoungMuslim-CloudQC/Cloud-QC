@@ -10,6 +10,11 @@ import {
   MAX_PHOTO_BYTES,
   ALLOWED_PHOTO_TYPES,
 } from "@/lib/profile-schema";
+import { buildDigestContent, digestEmailHtml } from "@/lib/digest";
+import { sendDigestEmail } from "@/lib/resend";
+import { memberName } from "@/lib/queries";
+
+const DIGEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export type ProfileState = { ok?: boolean; error?: string };
 
@@ -56,9 +61,17 @@ export async function updateProfile(
 
   // smsConsentAt tracks the moment consent was *given*; unchecking the box
   // clears it, and re-checking later stamps it fresh — never backdated.
-  const wasConsenting = await db.user.findUnique({
+  // Also need the *before* state to know whether the cadence actually
+  // changed (for the immediate-digest-on-opt-in below).
+  const before = await db.user.findUniqueOrThrow({
     where: { id: me.id },
-    select: { smsConsent: true },
+    select: {
+      smsConsent: true,
+      digestCadence: true,
+      lastDigestSentAt: true,
+      name: true,
+      email: true,
+    },
   });
 
   await db.user.update({
@@ -70,11 +83,40 @@ export async function updateProfile(
       notificationChannel: d.notificationChannel,
       smsConsent: d.smsConsent,
       smsConsentAt: d.smsConsent
-        ? (wasConsenting?.smsConsent ? undefined : new Date())
+        ? (before.smsConsent ? undefined : new Date())
         : null,
       ...(imageUrl ? { image: imageUrl } : {}),
     },
   });
+
+  // Selecting a cadence (turning it on, or picking a different one) sends
+  // an immediate digest right then, rather than making them wait for the
+  // next scheduled run — unless one already went out in the last 24h, to
+  // stop someone toggling the radio a few times from spamming themselves.
+  const cadenceChanged = d.digestCadence !== before.digestCadence;
+  const withinCooldown =
+    before.lastDigestSentAt &&
+    Date.now() - before.lastDigestSentAt.getTime() < DIGEST_COOLDOWN_MS;
+  if (cadenceChanged && d.digestCadence !== "OFF" && !withinCooldown) {
+    try {
+      const content = await buildDigestContent(me.id, d.digestCadence, before.lastDigestSentAt);
+      const { subject, html } = digestEmailHtml(content, {
+        firstName: memberName(before).split(" ")[0] ?? "there",
+        appUrl: process.env.APP_URL ?? "http://localhost:3000",
+      });
+      const sent = await sendDigestEmail({ to: before.email, subject, html });
+      // Best-effort: the profile save already succeeded regardless of
+      // whether this welcome digest goes out.
+      if (sent.ok) {
+        await db.user.update({
+          where: { id: me.id },
+          data: { lastDigestSentAt: new Date() },
+        });
+      }
+    } catch {
+      // swallow — see above
+    }
+  }
 
   revalidatePath("/profile");
   revalidatePath("/", "layout");

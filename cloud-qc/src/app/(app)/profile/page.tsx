@@ -38,7 +38,7 @@ export default async function ProfilePage() {
           notificationChannel={user.notificationChannel}
           smsConsent={user.smsConsent}
         />
-        <SendTestDigestButton />
+        {me.role === "ADMIN" && <SendTestDigestButton />}
       </div>
     </>
   );
