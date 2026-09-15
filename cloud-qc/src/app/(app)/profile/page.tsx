@@ -1,23 +1,30 @@
 import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
+import { getRegionMap } from "@/lib/queries";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { SendTestDigestButton } from "@/components/profile/SendTestDigestButton";
 
 export default async function ProfilePage() {
   const me = await requireApproved();
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: me.id },
-    select: {
-      name: true,
-      email: true,
-      image: true,
-      phone: true,
-      theme: true,
-      digestCadence: true,
-      notificationChannel: true,
-      smsConsent: true,
-    },
-  });
+  const [user, regionMap] = await Promise.all([
+    db.user.findUniqueOrThrow({
+      where: { id: me.id },
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        phone: true,
+        theme: true,
+        digestCadence: true,
+        notificationChannel: true,
+        smsConsent: true,
+        homeRegion: true,
+        homeSubArea: true,
+        digestSubAreas: true,
+      },
+    }),
+    getRegionMap(),
+  ]);
 
   return (
     <>
@@ -37,6 +44,10 @@ export default async function ProfilePage() {
           digestCadence={user.digestCadence}
           notificationChannel={user.notificationChannel}
           smsConsent={user.smsConsent}
+          homeRegion={user.homeRegion}
+          homeSubArea={user.homeSubArea}
+          digestSubAreas={user.digestSubAreas}
+          regionMap={regionMap}
         />
         {me.role === "ADMIN" && <SendTestDigestButton />}
       </div>

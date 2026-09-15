@@ -86,6 +86,16 @@ model User {
   smsConsentAt        DateTime?
   lastDigestSentAt    DateTime? // when their most recent digest email actually went out
 
+  // "Where I'm from" — matches Neighbornet.region/subArea's shape (not a FK;
+  // a home base, not a specific neighbornet). Setting/changing this also
+  // adds subArea to digestSubAreas as its default (see updateProfile).
+  homeRegion    String?
+  homeSubArea   String?
+  // Which Neighbornet.subArea values this user's digest covers. Empty means
+  // "no region picked yet" — buildDigestContent shows a nudge to set one
+  // rather than defaulting to everything.
+  digestSubAreas String[] @default([])
+
   accounts            Account[]
   sessions            Session[]
   submittedVisits     Visit[]              @relation("VisitSubmittedBy")

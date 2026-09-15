@@ -230,6 +230,29 @@ export type NeighbornetSummary = Awaited<
   ReturnType<typeof getNeighbornetSummaries>
 >[number];
 
+export type RegionMap = { region: string; subAreas: string[] }[];
+
+/** Live region -> subArea directory, derived from actual neighbornet data
+ *  rather than a hardcoded list — used to build the home-location and
+ *  digest-region pickers on /profile so they never drift from what
+ *  neighbornets actually exist. */
+export async function getRegionMap(): Promise<RegionMap> {
+  const rows = await db.neighbornet.findMany({
+    where: { archivedAt: null, subArea: { not: null } },
+    select: { region: true, subArea: true },
+    distinct: ["region", "subArea"],
+    orderBy: [{ region: "asc" }, { subArea: "asc" }],
+  });
+  const byRegion = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!r.subArea) continue;
+    const list = byRegion.get(r.region) ?? [];
+    list.push(r.subArea);
+    byRegion.set(r.region, list);
+  }
+  return [...byRegion.entries()].map(([region, subAreas]) => ({ region, subAreas }));
+}
+
 /** Distinct 2-letter state codes already in use — seeds the location picker. */
 export async function getUsedStateCodes(): Promise<string[]> {
   const rows = await db.neighbornet.findMany({

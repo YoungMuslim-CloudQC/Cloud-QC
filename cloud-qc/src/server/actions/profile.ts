@@ -12,7 +12,7 @@ import {
 } from "@/lib/profile-schema";
 import { buildDigestContent, digestEmailHtml } from "@/lib/digest";
 import { sendDigestEmail } from "@/lib/resend";
-import { memberName } from "@/lib/queries";
+import { memberName, getRegionMap } from "@/lib/queries";
 
 const DIGEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -30,11 +30,27 @@ export async function updateProfile(
     digestCadence: formData.get("digestCadence"),
     notificationChannel: formData.get("notificationChannel"),
     smsConsent: formData.get("smsConsent"),
+    homeRegion: formData.get("homeRegion"),
+    homeSubArea: formData.get("homeSubArea"),
+    digestSubAreas: formData.getAll("digestSubAreas"),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
   const d = parsed.data;
+
+  // homeRegion/homeSubArea and every digestSubAreas entry must be real,
+  // current subAreas — the zod schema above only checked shape, not that
+  // these actually exist (that needs a DB round-trip).
+  const regionMap = await getRegionMap();
+  const allSubAreas = new Set(regionMap.flatMap((r) => r.subAreas));
+  if (d.homeSubArea && !allSubAreas.has(d.homeSubArea)) {
+    return { ok: false, error: "Pick a valid area from the list." };
+  }
+  const invalidPick = d.digestSubAreas.find((a) => !allSubAreas.has(a));
+  if (invalidPick) {
+    return { ok: false, error: "Pick valid areas from the list." };
+  }
 
   // Photo is optional and only present when the user picked a new file.
   const photo = formData.get("photo");
@@ -85,6 +101,9 @@ export async function updateProfile(
       smsConsentAt: d.smsConsent
         ? (before.smsConsent ? undefined : new Date())
         : null,
+      homeRegion: d.homeRegion ?? null,
+      homeSubArea: d.homeSubArea ?? null,
+      digestSubAreas: d.digestSubAreas,
       ...(imageUrl ? { image: imageUrl } : {}),
     },
   });

@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 
 import { updateProfile, type ProfileState } from "@/server/actions/profile";
 import { THEMES, type ThemeKey } from "@/lib/profile-schema";
+import type { RegionMap } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
 
 const INITIAL: ProfileState = {};
@@ -47,6 +48,10 @@ export function ProfileForm({
   digestCadence,
   notificationChannel,
   smsConsent,
+  homeRegion,
+  homeSubArea,
+  digestSubAreas,
+  regionMap,
 }: {
   name: string;
   image: string | null;
@@ -55,6 +60,10 @@ export function ProfileForm({
   digestCadence: Cadence;
   notificationChannel: Channel;
   smsConsent: boolean;
+  homeRegion: string | null;
+  homeSubArea: string | null;
+  digestSubAreas: string[];
+  regionMap: RegionMap;
 }) {
   const [state, formAction, pending] = useActionState(updateProfile, INITIAL);
   const { update: updateSession } = useSession();
@@ -66,6 +75,20 @@ export function ProfileForm({
   const [selectedTheme, setSelectedTheme] = useState<ThemeKey>(
     (theme as ThemeKey) || "default",
   );
+  const [homeRegionValue, setHomeRegionValue] = useState(homeRegion ?? "");
+  const [homeSubAreaValue, setHomeSubAreaValue] = useState(homeSubArea ?? "");
+  const [subAreaPicks, setSubAreaPicks] = useState<Set<string>>(new Set(digestSubAreas));
+
+  const homeSubAreaOptions = regionMap.find((r) => r.region === homeRegionValue)?.subAreas ?? [];
+
+  function toggleSubArea(subArea: string) {
+    setSubAreaPicks((prev) => {
+      const next = new Set(prev);
+      if (next.has(subArea)) next.delete(subArea);
+      else next.add(subArea);
+      return next;
+    });
+  }
 
   const canText = phoneValue.trim().length > 0 && consent;
   // If phone/consent are withdrawn, an SMS/BOTH pick is no longer valid —
@@ -111,6 +134,50 @@ export function ProfileForm({
           value={phoneValue}
           onChange={(e) => setPhoneValue(e.target.value)}
         />
+      </div>
+
+      <div className="field">
+        <label>
+          Home location <span className="optional-tag">optional</span>
+        </label>
+        <div className="form-grid">
+          <div>
+            <select
+              name="homeRegion"
+              value={homeRegionValue}
+              onChange={(e) => {
+                setHomeRegionValue(e.target.value);
+                setHomeSubAreaValue(""); // area list just changed under it
+              }}
+            >
+              <option value="">Region…</option>
+              {regionMap.map((r) => (
+                <option key={r.region} value={r.region}>
+                  {r.region}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <select
+              name="homeSubArea"
+              value={homeSubAreaValue}
+              onChange={(e) => setHomeSubAreaValue(e.target.value)}
+              disabled={!homeRegionValue}
+            >
+              <option value="">Area…</option>
+              {homeSubAreaOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="survey-time-note">
+          Where you&rsquo;re from — this is the default for which
+          neighbornets your digest covers, below.
+        </div>
       </div>
 
       <div className="field">
@@ -215,8 +282,37 @@ export function ProfileForm({
               </label>
             ))}
           </div>
-          <div className="survey-time-note" style={{ marginTop: 10 }}>
+          <div className="survey-time-note" style={{ marginTop: 10, marginBottom: 14 }}>
             {digestNote(cadence, effectiveChannel, cadence !== digestCadence)}
+          </div>
+
+          <label style={{ display: "block", marginBottom: 8 }}>
+            Which areas <span className="optional-tag">optional</span>
+          </label>
+          <div className="region-pick-grid">
+            {regionMap.map((r) => (
+              <div key={r.region}>
+                <div className="region-pick-heading">{r.region}</div>
+                {r.subAreas.map((a) => (
+                  <label key={a} className="region-pick-item">
+                    <input
+                      type="checkbox"
+                      name="digestSubAreas"
+                      value={a}
+                      checked={subAreaPicks.has(a)}
+                      onChange={() => toggleSubArea(a)}
+                    />
+                    {a}
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="survey-time-note" style={{ marginTop: 10 }}>
+            Leave everything unchecked to automatically follow your home
+            location above. Check specific areas here instead to follow a
+            custom set — e.g. your home area plus a few others you help
+            oversee.
           </div>
         </div>
       </div>

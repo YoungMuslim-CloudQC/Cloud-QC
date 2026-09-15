@@ -27,6 +27,11 @@ export type DigestContent = {
   notVisitedNames: string[];
   yourVisitCount: number;
   periodLabel: string;
+  /** true when the user has no home location and no explicit region picks —
+   *  there's nothing regional to show them until they set one. */
+  noRegionSelected: boolean;
+  /** The subAreas this digest actually covers (for the email's own byline). */
+  subAreas: string[];
 };
 
 /** Is this user due for a digest right now, given their cadence and the
@@ -57,19 +62,10 @@ export async function buildDigestContent(
   const effectiveSince =
     since ?? new Date(Date.now() - CADENCE_DAYS[cadence] * 24 * 60 * 60 * 1000);
 
-  const [neighbornets, yourVisitCount] = await Promise.all([
-    db.neighbornet.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        visits: {
-          where: { deletedAt: null },
-          orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
-          select: { visitDate: true, status: true, notes: true },
-        },
-      },
+  const [user, yourVisitCount] = await Promise.all([
+    db.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { homeSubArea: true, digestSubAreas: true },
     }),
     db.visitParticipant.count({
       where: {
@@ -78,6 +74,41 @@ export async function buildDigestContent(
       },
     }),
   ]);
+
+  // Explicit picks win; home location is only a fallback default, not an
+  // always-on addition — otherwise it'd be un-opt-outable.
+  const subAreas =
+    user.digestSubAreas.length > 0
+      ? user.digestSubAreas
+      : user.homeSubArea
+        ? [user.homeSubArea]
+        : [];
+
+  if (subAreas.length === 0) {
+    return {
+      attention: [],
+      onTrackNames: [],
+      notVisitedNames: [],
+      yourVisitCount,
+      periodLabel: "",
+      noRegionSelected: true,
+      subAreas: [],
+    };
+  }
+
+  const neighbornets = await db.neighbornet.findMany({
+    where: { archivedAt: null, subArea: { in: subAreas } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      visits: {
+        where: { deletedAt: null },
+        orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
+        select: { visitDate: true, status: true, notes: true },
+      },
+    },
+  });
 
   const attention: DigestAttentionLine[] = [];
   const onTrackNames: string[] = [];
@@ -108,7 +139,15 @@ export async function buildDigestContent(
   const periodLabel =
     cadence === "WEEKLY" ? "This week" : cadence === "BIWEEKLY" ? "The last two weeks" : "This month";
 
-  return { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel };
+  return {
+    attention,
+    onTrackNames,
+    notVisitedNames,
+    yourVisitCount,
+    periodLabel,
+    noRegionSelected: false,
+    subAreas,
+  };
 }
 
 const STATUS_META = {
@@ -130,7 +169,29 @@ export function digestEmailHtml(
   content: DigestContent,
   opts: { firstName: string; appUrl: string },
 ): { subject: string; html: string } {
-  const { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel } = content;
+  const { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel, noRegionSelected, subAreas } =
+    content;
+
+  if (noRegionSelected) {
+    const subject = "Cloud QC Digest — set your region to get started";
+    const html = `
+    <div style="background:#0d0821;padding:32px 16px;font-family:Inter,Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;background:#170f32;border:1px solid #2c2258;border-radius:14px;padding:28px;">
+        <div style="font-weight:700;font-size:19px;color:#c4b5fd;margin-bottom:4px;">☁ Cloud QC</div>
+        <div style="color:#948CBB;font-size:12.5px;margin-bottom:20px;">Young Muslim · QC Ops</div>
+        <div style="color:#ede9fe;font-size:14px;margin-bottom:16px;">
+          Hi ${escapeHtml(opts.firstName)} — you're set up for digest emails, but haven't picked a
+          location yet, so there's nothing regional to show you.
+        </div>
+        <a href="${opts.appUrl}/profile"
+           style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:7px;">
+          Set your region in your profile
+        </a>
+      </div>
+    </div>`;
+    return { subject, html };
+  }
+
   const subject =
     attention.length > 0
       ? `Cloud QC Digest — ${attention.length} neighbornet${attention.length === 1 ? "" : "s"} need${attention.length === 1 ? "s" : ""} attention`
@@ -159,17 +220,13 @@ export function digestEmailHtml(
         .join("")
     : `<div style="padding:12px 0;color:#34d399;font-weight:600;">Everything's on track — nothing needs attention right now.</div>`;
 
-  const onTrackHtml = onTrackNames.length
-    ? `<div style="padding:12px 0;color:#948CBB;font-size:13px;">
-        ${escapeHtml(onTrackNames.join(", "))} (${onTrackNames.length} neighbornet${onTrackNames.length === 1 ? "" : "s"}, no action needed)
-      </div>`
-    : "";
+  const bulletList = (names: string[]) =>
+    `<ul style="margin:0;padding:0 0 8px 20px;color:#948CBB;font-size:13px;line-height:1.8;">
+      ${names.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
+    </ul>`;
 
-  const notVisitedHtml = notVisitedNames.length
-    ? `<div style="padding:12px 0;color:#948CBB;font-size:13px;">
-        ${escapeHtml(notVisitedNames.join(", "))} (${notVisitedNames.length} neighbornet${notVisitedNames.length === 1 ? "" : "s"}, no rated visit yet)
-      </div>`
-    : "";
+  const onTrackHtml = onTrackNames.length ? bulletList(onTrackNames) : "";
+  const notVisitedHtml = notVisitedNames.length ? bulletList(notVisitedNames) : "";
 
   const html = `
   <div style="background:#0d0821;padding:32px 16px;font-family:Inter,Arial,sans-serif;">
@@ -177,18 +234,21 @@ export function digestEmailHtml(
       <div style="font-weight:700;font-size:19px;color:#c4b5fd;margin-bottom:4px;">☁ Cloud QC</div>
       <div style="color:#948CBB;font-size:12.5px;margin-bottom:20px;">Young Muslim · QC Ops</div>
 
-      <div style="color:#ede9fe;font-size:14px;margin-bottom:20px;">
+      <div style="color:#ede9fe;font-size:14px;margin-bottom:4px;">
         Hi ${escapeHtml(opts.firstName)}, here's your ${periodLabel.toLowerCase()} neighbornet summary.
       </div>
+      <div style="color:#948CBB;font-size:12px;margin-bottom:20px;">
+        Covering: ${escapeHtml(subAreas.join(", "))}
+      </div>
 
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#fbbf24;margin-bottom:6px;">
+      <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#fbbf24;margin-bottom:6px;">
         Needs attention (${attention.length})
       </div>
       ${attentionHtml}
 
       ${
         onTrackNames.length
-          ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#34d399;margin:20px 0 6px 0;">
+          ? `<div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#34d399;margin:20px 0 6px 0;">
               On track (${onTrackNames.length})
             </div>
             ${onTrackHtml}`
@@ -197,14 +257,14 @@ export function digestEmailHtml(
 
       ${
         notVisitedNames.length
-          ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#948CBB;margin:20px 0 6px 0;">
+          ? `<div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#948CBB;margin:20px 0 6px 0;">
               Not visited yet (${notVisitedNames.length})
             </div>
             ${notVisitedHtml}`
           : ""
       }
 
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#38bdf8;margin:20px 0 6px 0;">
+      <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#38bdf8;margin:20px 0 6px 0;">
         Your activity — ${periodLabel.toLowerCase()}
       </div>
       <div style="color:#ede9fe;font-size:13px;">

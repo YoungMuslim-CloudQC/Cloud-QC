@@ -41,6 +41,11 @@ export const profileSchema = z
     digestCadence: z.enum(["OFF", "WEEKLY", "BIWEEKLY", "MONTHLY"]).default("OFF"),
     notificationChannel: z.enum(["EMAIL", "SMS", "BOTH"]).default("EMAIL"),
     smsConsent: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()),
+    // Validated against the live region map (not statically known here) in
+    // the action itself — this just checks shape.
+    homeRegion: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
+    homeSubArea: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
+    digestSubAreas: z.array(z.string().trim().max(80)).default([]),
   })
   .refine((d) => d.notificationChannel === "EMAIL" || Boolean(d.phone), {
     message: "Add a phone number to receive SMS notifications.",
@@ -49,6 +54,10 @@ export const profileSchema = z
   .refine((d) => d.notificationChannel === "EMAIL" || d.smsConsent, {
     message: "Check the consent box to receive text messages.",
     path: ["smsConsent"],
+  })
+  .refine((d) => Boolean(d.homeRegion) === Boolean(d.homeSubArea), {
+    message: "Pick both a region and an area, or leave both blank.",
+    path: ["homeSubArea"],
   });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
