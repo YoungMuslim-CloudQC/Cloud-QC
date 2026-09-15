@@ -24,6 +24,7 @@ export type DigestAttentionLine = {
 export type DigestContent = {
   attention: DigestAttentionLine[];
   onTrackNames: string[];
+  notVisitedNames: string[];
   yourVisitCount: number;
   periodLabel: string;
 };
@@ -80,6 +81,7 @@ export async function buildDigestContent(
 
   const attention: DigestAttentionLine[] = [];
   const onTrackNames: string[] = [];
+  const notVisitedNames: string[] = [];
 
   for (const n of neighbornets) {
     const status = hysteresisStatus(n.visits);
@@ -92,8 +94,13 @@ export async function buildDigestContent(
         lastVisitDate: latest ? isoDate(latest.visitDate) : null,
         lastVisitNote: latest?.notes ?? null,
       });
-    } else {
+    } else if (status === "ON_TRACK") {
+      // Only genuinely-rated ON_TRACK visits belong here — a neighbornet
+      // with no rated visits falls through to notVisitedNames below instead
+      // of being lumped in as if it were a verified-good status.
       onTrackNames.push(n.name);
+    } else {
+      notVisitedNames.push(n.name);
     }
   }
   attention.sort((a, b) => SEVERITY[b.status] - SEVERITY[a.status]);
@@ -101,7 +108,7 @@ export async function buildDigestContent(
   const periodLabel =
     cadence === "WEEKLY" ? "This week" : cadence === "BIWEEKLY" ? "The last two weeks" : "This month";
 
-  return { attention, onTrackNames, yourVisitCount, periodLabel };
+  return { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel };
 }
 
 const STATUS_META = {
@@ -123,7 +130,7 @@ export function digestEmailHtml(
   content: DigestContent,
   opts: { firstName: string; appUrl: string },
 ): { subject: string; html: string } {
-  const { attention, onTrackNames, yourVisitCount, periodLabel } = content;
+  const { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel } = content;
   const subject =
     attention.length > 0
       ? `Cloud QC Digest — ${attention.length} neighbornet${attention.length === 1 ? "" : "s"} need${attention.length === 1 ? "s" : ""} attention`
@@ -158,6 +165,12 @@ export function digestEmailHtml(
       </div>`
     : "";
 
+  const notVisitedHtml = notVisitedNames.length
+    ? `<div style="padding:12px 0;color:#948CBB;font-size:13px;">
+        ${escapeHtml(notVisitedNames.join(", "))} (${notVisitedNames.length} neighbornet${notVisitedNames.length === 1 ? "" : "s"}, no rated visit yet)
+      </div>`
+    : "";
+
   const html = `
   <div style="background:#0d0821;padding:32px 16px;font-family:Inter,Arial,sans-serif;">
     <div style="max-width:560px;margin:0 auto;background:#170f32;border:1px solid #2c2258;border-radius:14px;padding:28px;">
@@ -179,6 +192,15 @@ export function digestEmailHtml(
               On track (${onTrackNames.length})
             </div>
             ${onTrackHtml}`
+          : ""
+      }
+
+      ${
+        notVisitedNames.length
+          ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#948CBB;margin:20px 0 6px 0;">
+              Not visited yet (${notVisitedNames.length})
+            </div>
+            ${notVisitedHtml}`
           : ""
       }
 
