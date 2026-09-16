@@ -1534,6 +1534,7 @@ tr:last-child td {
   flex-wrap: wrap;
   gap: 14px;
   justify-content: center;
+  width: 100%;
 }
 .orbit-cell {
   width: 200px;

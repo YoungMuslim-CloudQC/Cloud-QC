@@ -119,29 +119,48 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
   }, [nodes]);
 
   const allSubAreas = useMemo(() => regionMap.flatMap((r) => r.subAreas), [regionMap]);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(allSubAreas));
+  // Order here is selection order, not region order: newly picked areas go to
+  // the end, so cells lay out in the sequence the user actually clicked them.
+  const [selectedOrder, setSelectedOrder] = useState<string[]>(() => allSubAreas);
 
   function toggleSubArea(subArea: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(subArea)) next.delete(subArea);
-      else next.add(subArea);
-      return next;
-    });
+    setSelectedOrder((prev) =>
+      prev.includes(subArea)
+        ? prev.filter((s) => s !== subArea)
+        : [...prev, subArea],
+    );
   }
 
+  const regionBySubArea = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of regionMap) for (const a of r.subAreas) m.set(a, r.region);
+    return m;
+  }, [regionMap]);
+
   const cells = useMemo(() => {
-    return regionMap
-      .flatMap((r) => r.subAreas.map((subArea) => ({ region: r.region, subArea })))
-      .filter((s) => selected.has(s.subArea))
-      .map(({ region, subArea }) =>
+    return selectedOrder
+      .filter((subArea) => regionBySubArea.has(subArea))
+      .map((subArea) =>
         buildCell(
           subArea,
-          region,
+          regionBySubArea.get(subArea)!,
           nodes.filter((n) => n.subArea === subArea),
         ),
       );
-  }, [regionMap, selected, nodes]);
+  }, [selectedOrder, regionBySubArea, nodes]);
+
+  // Cells fill a row middle-out in pick order — 1st pick anchors the middle,
+  // 2nd goes to its right, 3rd to its left — then the next pick starts a new
+  // row as its own middle, and so on. Reorder each group of three into
+  // [3rd, 1st, 2nd] so that's how they actually land left-to-right.
+  const displayCells = useMemo(() => {
+    const out: Cell[] = [];
+    for (let i = 0; i < cells.length; i += 3) {
+      const row = cells.slice(i, i + 3);
+      out.push(...(row.length === 3 ? [row[2], row[0], row[1]] : row));
+    }
+    return out;
+  }, [cells]);
 
   return (
     <div>
@@ -154,7 +173,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
                 <label key={a} className="region-pick-item">
                   <input
                     type="checkbox"
-                    checked={selected.has(a)}
+                    checked={selectedOrder.includes(a)}
                     onChange={() => toggleSubArea(a)}
                   />
                   {a}
@@ -171,7 +190,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
         </div>
       ) : (
         <div className="orbit-cells-wrap">
-          {cells.map((cell) => (
+          {displayCells.map((cell) => (
             <OrbitCell key={cell.subArea} cell={cell} />
           ))}
         </div>
