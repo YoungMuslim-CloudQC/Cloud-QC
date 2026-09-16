@@ -225,8 +225,12 @@ export function digestEmailHtml(
       ${names.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
     </ul>`;
 
-  const onTrackHtml = onTrackNames.length ? bulletList(onTrackNames) : "";
-  const notVisitedHtml = notVisitedNames.length ? bulletList(notVisitedNames) : "";
+  const onTrackHtml = onTrackNames.length
+    ? bulletList(onTrackNames)
+    : `<div style="padding:8px 0 12px 0;color:#948CBB;font-size:13px;">None yet — nothing in your area has a confirmed on-track visit.</div>`;
+  const notVisitedHtml = notVisitedNames.length
+    ? bulletList(notVisitedNames)
+    : `<div style="padding:8px 0 12px 0;color:#948CBB;font-size:13px;">None — every neighbornet in your area has at least one rated visit.</div>`;
 
   const html = `
   <div style="background:#0d0821;padding:32px 16px;font-family:Inter,Arial,sans-serif;">
@@ -246,23 +250,15 @@ export function digestEmailHtml(
       </div>
       ${attentionHtml}
 
-      ${
-        onTrackNames.length
-          ? `<div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#34d399;margin:20px 0 6px 0;">
-              On track (${onTrackNames.length})
-            </div>
-            ${onTrackHtml}`
-          : ""
-      }
+      <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#34d399;margin:20px 0 6px 0;">
+        On track (${onTrackNames.length})
+      </div>
+      ${onTrackHtml}
 
-      ${
-        notVisitedNames.length
-          ? `<div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#948CBB;margin:20px 0 6px 0;">
-              Not visited yet (${notVisitedNames.length})
-            </div>
-            ${notVisitedHtml}`
-          : ""
-      }
+      <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#948CBB;margin:20px 0 6px 0;">
+        Not visited yet (${notVisitedNames.length})
+      </div>
+      ${notVisitedHtml}
 
       <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#38bdf8;margin:20px 0 6px 0;">
         Your activity — ${periodLabel.toLowerCase()}

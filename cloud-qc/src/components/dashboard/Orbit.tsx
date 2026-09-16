@@ -21,14 +21,22 @@ function hashStr(s: string): number {
   return h;
 }
 
-/** More nodes sharing a ring -> smaller dots, so a 30-neighbornet region
- *  doesn't just overlap into a blob. */
+/** More nodes sharing a ring -> smaller dots (and smaller name labels), so a
+ *  30-neighbornet region doesn't just overlap into a blob. */
 function dotRadiusFor(count: number): number {
   if (count <= 6) return 15;
   if (count <= 12) return 11;
   if (count <= 24) return 8;
   return 6;
 }
+
+type PositionedNode = OrbitNode & {
+  x: number;
+  y: number;
+  angle: number;
+  dotR: number;
+  fontSize: number;
+};
 
 export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
   const regionsPresent = useMemo(() => {
@@ -53,9 +61,11 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
 
   // Lay out one ring per active region, each pushed out far enough that the
   // previous ring's dots (whatever size they ended up) don't collide with it.
-  const rings = useMemo(() => {
+  // Positions are computed once here and reused for the lines/dots/labels
+  // below, rather than three separate copies of the same trig.
+  const { rings, positioned, size } = useMemo(() => {
     let cursor = 58;
-    return activeRegions.map((region) => {
+    const builtRings = activeRegions.map((region) => {
       const regionNodes = nodes.filter((n) => n.region === region);
       const count = regionNodes.length;
       const dotR = dotRadiusFor(count);
@@ -64,10 +74,32 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
       cursor = radius + dotR + 26;
       return { region, radius, dotR, nodes: regionNodes };
     });
+
+    const cxy = 0; // placeholder, real cx/cy computed after size below
+    const built: PositionedNode[] = [];
+    for (const ring of builtRings) {
+      const fontSize = Math.max(7, Math.min(10, ring.dotR + 1));
+      ring.nodes.forEach((n, i) => {
+        const angle = (i / ring.nodes.length) * Math.PI * 2 - Math.PI / 2 + 0.35;
+        built.push({
+          ...n,
+          angle,
+          dotR: ring.dotR,
+          fontSize,
+          x: cxy + ring.radius * Math.cos(angle),
+          y: cxy + ring.radius * Math.sin(angle),
+        });
+      });
+    }
+
+    const outer = builtRings.length ? builtRings[builtRings.length - 1] : null;
+    // Extra padding beyond the outermost dot so its name label has room to
+    // sit outside the ring instead of being clipped by the viewBox edge.
+    const computedSize = Math.max(240, (outer ? outer.radius + outer.dotR : 60) * 2 + 160);
+
+    return { rings: builtRings, positioned: built, size: computedSize };
   }, [activeRegions, nodes]);
 
-  const outer = rings.length ? rings[rings.length - 1] : null;
-  const size = Math.max(220, (outer ? outer.radius + outer.dotR : 60) * 2 + 44);
   const cx = size / 2;
   const cy = size / 2;
 
@@ -95,7 +127,7 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
       ) : (
         <svg
           viewBox={`0 0 ${size} ${size}`}
-          style={{ width: "100%", height: "auto", display: "block", maxWidth: 420, margin: "0 auto" }}
+          style={{ width: "100%", height: "auto", display: "block", maxWidth: 480, margin: "0 auto" }}
         >
           {/* Faint ring boundaries — the "cell membrane" look, one per region. */}
           {rings.map((ring, ri) => (
@@ -116,25 +148,18 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
             />
           ))}
 
-          {rings.map((ring) =>
-            ring.nodes.map((n, i) => {
-              const angle = (i / ring.nodes.length) * Math.PI * 2 - Math.PI / 2 + 0.35;
-              const x = cx + ring.radius * Math.cos(angle);
-              const y = cy + ring.radius * Math.sin(angle);
-              return (
-                <line
-                  key={`l-${n.id}`}
-                  x1={cx}
-                  y1={cy}
-                  x2={x}
-                  y2={y}
-                  stroke="var(--border)"
-                  strokeWidth={1.2}
-                  opacity={0.6}
-                />
-              );
-            }),
-          )}
+          {positioned.map((n) => (
+            <line
+              key={`l-${n.id}`}
+              x1={cx}
+              y1={cy}
+              x2={cx + n.x}
+              y2={cy + n.y}
+              stroke="var(--border)"
+              strokeWidth={1.2}
+              opacity={0.6}
+            />
+          ))}
 
           <circle
             className="orbit-animated"
@@ -179,34 +204,51 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
             );
           })}
 
-          {rings.map((ring) =>
-            ring.nodes.map((n, i) => {
-              const angle = (i / ring.nodes.length) * Math.PI * 2 - Math.PI / 2 + 0.35;
-              const x = cx + ring.radius * Math.cos(angle);
-              const y = cy + ring.radius * Math.sin(angle);
-              const h = hashStr(n.id);
-              const variant = DRIFT_VARIANTS[h % DRIFT_VARIANTS.length];
-              const duration = 4 + (h % 30) / 10;
-              const delay = (h % 25) / 10;
-              return (
+          {positioned.map((n) => {
+            const h = hashStr(n.id);
+            const variant = DRIFT_VARIANTS[h % DRIFT_VARIANTS.length];
+            const duration = 4 + (h % 30) / 10;
+            const delay = (h % 25) / 10;
+            const nx = cx + n.x;
+            const ny = cy + n.y;
+            // Name sits radially outside the dot, on the same angle as the
+            // node — that fans labels out and away from each other instead
+            // of piling them all at the bottom like the old layout did.
+            const labelR = Math.hypot(n.x, n.y) + n.dotR + 5;
+            const lx = cx + labelR * Math.cos(n.angle);
+            const ly = cy + labelR * Math.sin(n.angle);
+            const cos = Math.cos(n.angle);
+            const anchor = cos > 0.15 ? "start" : cos < -0.15 ? "end" : "middle";
+            return (
+              <g key={`n-${n.id}`}>
                 <circle
-                  key={`n-${n.id}`}
                   className="orbit-animated"
-                  cx={x}
-                  cy={y}
-                  r={ring.dotR}
+                  cx={nx}
+                  cy={ny}
+                  r={n.dotR}
                   fill={ragColor(n.status)}
                   style={{
-                    transformOrigin: `${x}px ${y}px`,
+                    transformOrigin: `${nx}px ${ny}px`,
                     animation: `${variant} ${duration}s ease-in-out infinite`,
                     animationDelay: `${delay}s`,
                   }}
                 >
                   <title>{n.name}</title>
                 </circle>
-              );
-            }),
-          )}
+                <text
+                  x={lx}
+                  y={ly}
+                  textAnchor={anchor}
+                  dominantBaseline="middle"
+                  fontFamily="var(--font-body), sans-serif"
+                  fontSize={n.fontSize}
+                  fill="var(--text-muted)"
+                >
+                  {n.name}
+                </text>
+              </g>
+            );
+          })}
         </svg>
       )}
     </div>
