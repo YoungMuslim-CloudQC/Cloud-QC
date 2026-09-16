@@ -1,12 +1,12 @@
 import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
-import { getRegionMap } from "@/lib/queries";
+import { getRegionMap, getNeighbornetOptions } from "@/lib/queries";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { SendTestDigestButton } from "@/components/profile/SendTestDigestButton";
 
 export default async function ProfilePage() {
   const me = await requireApproved();
-  const [user, regionMap] = await Promise.all([
+  const [user, regionMap, neighbornetOptions] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id: me.id },
       select: {
@@ -21,9 +21,11 @@ export default async function ProfilePage() {
         homeRegion: true,
         homeSubArea: true,
         digestSubAreas: true,
+        representingNeighbornetId: true,
       },
     }),
     getRegionMap(),
+    getNeighbornetOptions(),
   ]);
 
   return (
@@ -48,6 +50,8 @@ export default async function ProfilePage() {
           homeSubArea={user.homeSubArea}
           digestSubAreas={user.digestSubAreas}
           regionMap={regionMap}
+          representingNeighbornetId={user.representingNeighbornetId}
+          neighbornetOptions={neighbornetOptions}
         />
         {me.role === "ADMIN" && <SendTestDigestButton />}
       </div>

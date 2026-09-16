@@ -175,6 +175,7 @@ export type MemberStat = {
   distinctNeighbornets: number;
   pending: number;
   lastVisit: Date | null;
+  representingNeighbornet: { id: string; name: string } | null;
 };
 
 /** Per-member visit stats, derived from participant rows (which cover both
@@ -184,7 +185,14 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
     db.user.findMany({
       where: { status: "APPROVED" },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, image: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        representingNeighbornet: { select: { id: true, name: true } },
+      },
     }),
     db.visitParticipant.findMany({
       where: { visit: { deletedAt: null } },
@@ -222,7 +230,32 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
       distinctNeighbornets: nnSet.size,
       pending: rows.filter((r) => !r.visit.feedbackSent).length,
       lastVisit: last,
+      representingNeighbornet: m.representingNeighbornet,
     };
+  });
+}
+
+/** Every active neighbornet, grouped for a <select>'s <optgroup>s — used by
+ *  the "which neighbornet do you represent" picker on /profile. */
+export async function getNeighbornetOptions(): Promise<
+  { id: string; name: string; region: string; subArea: string | null }[]
+> {
+  return db.neighbornet.findMany({
+    where: { archivedAt: null },
+    orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, region: true, subArea: true },
+  });
+}
+
+/** Members ranked by distinct neighbornets visited (ties broken by total
+ *  visit count, then name) — the Cloud Team leaderboard. */
+export function rankByNeighbornetsVisited(members: MemberStat[]): MemberStat[] {
+  return [...members].sort((a, b) => {
+    if (b.distinctNeighbornets !== a.distinctNeighbornets) {
+      return b.distinctNeighbornets - a.distinctNeighbornets;
+    }
+    if (b.visitCount !== a.visitCount) return b.visitCount - a.visitCount;
+    return a.name.localeCompare(b.name);
   });
 }
 

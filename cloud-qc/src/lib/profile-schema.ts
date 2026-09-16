@@ -46,6 +46,9 @@ export const profileSchema = z
     homeRegion: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
     homeSubArea: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
     digestSubAreas: z.array(z.string().trim().max(80)).default([]),
+    // Validated against real neighbornet ids (not statically known here) in
+    // the action itself.
+    representingNeighbornetId: z.preprocess(emptyToUndef, z.string().trim().optional()),
   })
   .refine((d) => d.notificationChannel === "EMAIL" || Boolean(d.phone), {
     message: "Add a phone number to receive SMS notifications.",
