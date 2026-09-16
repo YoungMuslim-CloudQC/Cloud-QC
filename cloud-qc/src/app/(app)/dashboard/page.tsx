@@ -137,6 +137,8 @@ export default async function DashboardPage() {
                 name: n.name,
                 status: n.displayStatus,
                 region: n.region,
+                subArea: n.subArea,
+                visitCount: n.visitCount,
               }))}
             />
           </div>
