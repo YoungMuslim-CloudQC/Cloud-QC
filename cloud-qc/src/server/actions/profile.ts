@@ -33,6 +33,7 @@ export async function updateProfile(
     homeRegion: formData.get("homeRegion"),
     homeSubArea: formData.get("homeSubArea"),
     digestSubAreas: formData.getAll("digestSubAreas"),
+    representingNeighbornetId: formData.get("representingNeighbornetId"),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -50,6 +51,15 @@ export async function updateProfile(
   const invalidPick = d.digestSubAreas.find((a) => !allSubAreas.has(a));
   if (invalidPick) {
     return { ok: false, error: "Pick valid areas from the list." };
+  }
+  if (d.representingNeighbornetId) {
+    const exists = await db.neighbornet.findFirst({
+      where: { id: d.representingNeighbornetId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!exists) {
+      return { ok: false, error: "Pick a valid neighbornet to represent." };
+    }
   }
 
   // Photo is optional and only present when the user picked a new file.
@@ -104,6 +114,7 @@ export async function updateProfile(
       homeRegion: d.homeRegion ?? null,
       homeSubArea: d.homeSubArea ?? null,
       digestSubAreas: d.digestSubAreas,
+      representingNeighbornetId: d.representingNeighbornetId ?? null,
       ...(imageUrl ? { image: imageUrl } : {}),
     },
   });
