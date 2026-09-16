@@ -136,6 +136,7 @@ export default async function DashboardPage() {
                 id: n.id,
                 name: n.name,
                 status: n.displayStatus,
+                region: n.region,
               }))}
             />
           </div>
