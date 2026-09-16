@@ -131,6 +131,15 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
     );
   }
 
+  function toggleRegion(subAreas: string[]) {
+    setSelectedOrder((prev) => {
+      const allSelected = subAreas.every((a) => prev.includes(a));
+      if (allSelected) return prev.filter((a) => !subAreas.includes(a));
+      const toAdd = subAreas.filter((a) => !prev.includes(a));
+      return [...prev, ...toAdd];
+    });
+  }
+
   const regionBySubArea = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of regionMap) for (const a of r.subAreas) m.set(a, r.region);
@@ -166,9 +175,22 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
     <div>
       {allSubAreas.length > 1 && (
         <div className="region-pick-grid orbit-subarea-toggles">
-          {regionMap.map((r) => (
+          {regionMap.map((r) => {
+            const allSelected = r.subAreas.every((a) => selectedOrder.includes(a));
+            return (
             <div key={r.region}>
-              <div className="region-pick-heading">{r.region}</div>
+              <div className="orbit-region-heading-row">
+                <div className="region-pick-heading">{r.region}</div>
+                {r.subAreas.length > 1 && (
+                  <button
+                    type="button"
+                    className="orbit-region-toggle-all"
+                    onClick={() => toggleRegion(r.subAreas)}
+                  >
+                    {allSelected ? "Clear" : "All"}
+                  </button>
+                )}
+              </div>
               {r.subAreas.map((a) => (
                 <label key={a} className="region-pick-item">
                   <input
@@ -180,7 +202,8 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
                 </label>
               ))}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
