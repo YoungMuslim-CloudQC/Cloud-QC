@@ -95,16 +95,16 @@ export function NeighbornetForm({
         />
         <Field
           name="region"
-          label="Region"
-          placeholder="e.g. Northeast"
+          label="State"
+          placeholder="e.g. New Jersey"
           required
           defaultValue={initial?.region ?? ""}
           error={fe.region}
         />
         <Field
           name="subArea"
-          label="Sub-area"
-          optional="optional"
+          label="Breakdown within state"
+          optional="optional — only if the state is split"
           placeholder="e.g. North New Jersey"
           defaultValue={initial?.subArea ?? ""}
           error={fe.subArea}

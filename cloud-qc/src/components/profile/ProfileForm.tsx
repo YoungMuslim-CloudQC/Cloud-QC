@@ -150,7 +150,7 @@ export function ProfileForm({
                 setHomeSubAreaValue(""); // area list just changed under it
               }}
             >
-              <option value="">Region…</option>
+              <option value="">State…</option>
               {regionMap.map((r) => (
                 <option key={r.region} value={r.region}>
                   {r.region}
@@ -159,19 +159,33 @@ export function ProfileForm({
             </select>
           </div>
           <div>
-            <select
-              name="homeSubArea"
-              value={homeSubAreaValue}
-              onChange={(e) => setHomeSubAreaValue(e.target.value)}
-              disabled={!homeRegionValue}
-            >
-              <option value="">Area…</option>
-              {homeSubAreaOptions.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+            {homeSubAreaOptions.length > 1 ? (
+              <select
+                name="homeSubArea"
+                value={homeSubAreaValue}
+                onChange={(e) => setHomeSubAreaValue(e.target.value)}
+              >
+                <option value="">Area…</option>
+                {homeSubAreaOptions.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <select disabled>
+                  <option>
+                    {homeRegionValue ? "No further breakdown" : "Area…"}
+                  </option>
+                </select>
+                <input
+                  type="hidden"
+                  name="homeSubArea"
+                  value={homeSubAreaOptions[0] ?? ""}
+                />
+              </>
+            )}
           </div>
         </div>
         <div className="survey-time-note">
@@ -290,23 +304,43 @@ export function ProfileForm({
             Which areas <span className="optional-tag">optional</span>
           </label>
           <div className="region-pick-grid">
-            {regionMap.map((r) => (
-              <div key={r.region}>
-                <div className="region-pick-heading">{r.region}</div>
-                {r.subAreas.map((a) => (
-                  <label key={a} className="region-pick-item">
+            {regionMap.map((r) => {
+              // Most states have no further split — show the state itself
+              // as one checkbox instead of a heading over a single
+              // redundant item. Split states (NJ, NY, TX) still expand.
+              if (r.subAreas.length <= 1) {
+                const value = r.subAreas[0] ?? r.region;
+                return (
+                  <label key={r.region} className="region-pick-item">
                     <input
                       type="checkbox"
                       name="digestSubAreas"
-                      value={a}
-                      checked={subAreaPicks.has(a)}
-                      onChange={() => toggleSubArea(a)}
+                      value={value}
+                      checked={subAreaPicks.has(value)}
+                      onChange={() => toggleSubArea(value)}
                     />
-                    {a}
+                    {r.region}
                   </label>
-                ))}
-              </div>
-            ))}
+                );
+              }
+              return (
+                <div key={r.region}>
+                  <div className="region-pick-heading">{r.region}</div>
+                  {r.subAreas.map((a) => (
+                    <label key={a} className="region-pick-item">
+                      <input
+                        type="checkbox"
+                        name="digestSubAreas"
+                        value={a}
+                        checked={subAreaPicks.has(a)}
+                        onChange={() => toggleSubArea(a)}
+                      />
+                      {a}
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
           </div>
           <div className="survey-time-note" style={{ marginTop: 10 }}>
             Leave everything unchecked to automatically follow your home
