@@ -7,6 +7,7 @@ import { updateProfile, type ProfileState } from "@/server/actions/profile";
 import { THEMES, type ThemeKey } from "@/lib/profile-schema";
 import type { RegionMap } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
+import { AreaMultiSelect } from "@/components/profile/AreaMultiSelect";
 
 const INITIAL: ProfileState = {};
 
@@ -86,6 +87,17 @@ export function ProfileForm({
       const next = new Set(prev);
       if (next.has(subArea)) next.delete(subArea);
       else next.add(subArea);
+      return next;
+    });
+  }
+
+  function setManySubAreas(values: string[], checked: boolean) {
+    setSubAreaPicks((prev) => {
+      const next = new Set(prev);
+      for (const v of values) {
+        if (checked) next.add(v);
+        else next.delete(v);
+      }
       return next;
     });
   }
@@ -303,45 +315,13 @@ export function ProfileForm({
           <label style={{ display: "block", marginBottom: 8 }}>
             Which areas <span className="optional-tag">optional</span>
           </label>
-          <div className="region-pick-grid">
-            {regionMap.map((r) => {
-              // Most states have no further split — show the state itself
-              // as one checkbox instead of a heading over a single
-              // redundant item. Split states (NJ, NY, TX) still expand.
-              if (r.subAreas.length <= 1) {
-                const value = r.subAreas[0] ?? r.region;
-                return (
-                  <label key={r.region} className="region-pick-item">
-                    <input
-                      type="checkbox"
-                      name="digestSubAreas"
-                      value={value}
-                      checked={subAreaPicks.has(value)}
-                      onChange={() => toggleSubArea(value)}
-                    />
-                    {r.region}
-                  </label>
-                );
-              }
-              return (
-                <div key={r.region}>
-                  <div className="region-pick-heading">{r.region}</div>
-                  {r.subAreas.map((a) => (
-                    <label key={a} className="region-pick-item">
-                      <input
-                        type="checkbox"
-                        name="digestSubAreas"
-                        value={a}
-                        checked={subAreaPicks.has(a)}
-                        onChange={() => toggleSubArea(a)}
-                      />
-                      {a}
-                    </label>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+          <AreaMultiSelect
+            regionMap={regionMap}
+            selected={subAreaPicks}
+            onToggle={toggleSubArea}
+            onSetMany={setManySubAreas}
+            fieldName="digestSubAreas"
+          />
           <div className="survey-time-note" style={{ marginTop: 10 }}>
             Leave everything unchecked to automatically follow your home
             location above. Check specific areas here instead to follow a

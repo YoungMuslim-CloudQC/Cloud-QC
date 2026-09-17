@@ -1519,6 +1519,101 @@ tr:last-child td {
   cursor: pointer;
 }
 
+/* Closed-by-default area picker — a checkbox tree for the three split
+   states (NJ/NY/TX), flat single checkboxes for everything else. */
+.area-dropdown {
+  position: relative;
+}
+.area-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font-body), "Inter", sans-serif;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.area-dropdown-trigger:focus {
+  outline: 2px solid var(--secondary);
+  outline-offset: 0;
+  border-color: var(--secondary);
+}
+.area-dropdown-placeholder {
+  color: var(--placeholder);
+}
+.area-dropdown-caret {
+  color: var(--text-muted);
+  font-size: 9px;
+  flex-shrink: 0;
+}
+.area-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.area-dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.area-dropdown-row:hover {
+  background: var(--surface-2);
+}
+.area-dropdown-parent {
+  font-weight: 600;
+  color: var(--heading);
+}
+.area-dropdown-label {
+  flex: 1;
+  cursor: pointer;
+}
+.area-dropdown-chevron {
+  background: none;
+  border: 1px solid var(--border);
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.area-dropdown-chevron:hover {
+  border-color: var(--secondary);
+  color: var(--text);
+}
+.area-dropdown-children {
+  padding-left: 22px;
+}
+.area-dropdown-child {
+  color: var(--text-muted);
+}
+
 /* ================= DASHBOARD ORBIT ================= */
 .orbit-region-toggles {
   display: flex;
