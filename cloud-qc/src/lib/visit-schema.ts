@@ -8,7 +8,12 @@ const smallInt = z.number().int().min(0).max(100000).nullable();
 
 // The client sends a clean, typed object (not FormData).
 export const visitInputSchema = z.object({
-  neighbornetId: z.string().min(1, "Pick a neighbornet"),
+  // Usually one neighbornet; more than one means a joint event — one Visit
+  // row gets created per neighbornet, linked by a shared jointEventId.
+  neighbornetIds: z
+    .array(z.string().min(1))
+    .min(1, "Pick at least one neighbornet")
+    .max(10, "That's a lot of neighbornets for one event — split it up"),
   visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a valid date"),
   groupSize: smallInt,
   avgAge: smallInt,
@@ -23,7 +28,7 @@ export const visitInputSchema = z.object({
 export type VisitInput = z.infer<typeof visitInputSchema>;
 
 export const EMPTY_VISIT_INPUT: VisitInput = {
-  neighbornetId: "",
+  neighbornetIds: [],
   visitDate: "",
   groupSize: null,
   avgAge: null,
@@ -37,6 +42,7 @@ export const EMPTY_VISIT_INPUT: VisitInput = {
 
 export type DuplicateInfo = {
   visitId: string;
+  neighbornetId: string;
   submittedByName: string;
   neighbornetName: string;
   visitDate: string;
@@ -45,4 +51,6 @@ export type DuplicateInfo = {
 export type SubmitResult =
   | { ok: true; visitId: string }
   | { ok: false; error: string }
-  | { ok: false; duplicate: DuplicateInfo };
+  // One entry per selected neighbornet that already has a visit logged —
+  // usually just one, but a joint-event submission can hit several at once.
+  | { ok: false; duplicates: DuplicateInfo[] };

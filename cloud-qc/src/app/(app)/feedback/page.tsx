@@ -7,6 +7,7 @@ import { isoDate, statusMeta } from "@/lib/format";
 import { EMPTY_VISIT_INPUT, type VisitInput } from "@/lib/visit-schema";
 import { PageHead } from "@/components/PageHead";
 import { FeedbackForm } from "@/components/feedback/FeedbackForm";
+import { SubmissionRowActions } from "@/components/feedback/SubmissionRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export default async function FeedbackPage({
       visitId: editingVisit.id,
       input: {
         ...EMPTY_VISIT_INPUT,
-        neighbornetId: editingVisit.neighbornetId,
+        neighbornetIds: [editingVisit.neighbornetId],
         visitDate: isoDate(editingVisit.visitDate),
         groupSize: editingVisit.groupSize,
         avgAge: editingVisit.avgAge,
@@ -101,7 +102,7 @@ export default async function FeedbackPage({
               <div
                 className="visit-row"
                 key={v.id}
-                style={{ gridTemplateColumns: "90px 1fr 90px" }}
+                style={{ gridTemplateColumns: "90px 1fr auto" }}
               >
                 <div className="visit-date">
                   <Link href={`/visits/${v.id}`}>{isoDate(v.visitDate)}</Link>
@@ -110,14 +111,7 @@ export default async function FeedbackPage({
                   <div className="visit-nn">{v.neighbornet.name}</div>
                   <span className={`badge ${meta.cls}`}>{meta.label}</span>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <Link
-                    className="btn btn-secondary btn-small"
-                    href={`/feedback?edit=${v.id}`}
-                  >
-                    Edit
-                  </Link>
-                </div>
+                <SubmissionRowActions visitId={v.id} />
               </div>
             );
           })

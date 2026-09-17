@@ -11,9 +11,8 @@ import {
   type VisitStatusValue,
 } from "@/lib/visit-schema";
 import {
-  linkToExistingVisit,
+  resolveJointDuplicates,
   submitFeedback,
-  submitSeparateVisit,
   updateFeedback,
 } from "@/server/actions/visits";
 
@@ -53,19 +52,24 @@ export function FeedbackForm({
     ? editing.input
     : {
         ...EMPTY_VISIT_INPUT,
-        neighbornetId: neighbornets[0]?.id ?? "",
+        neighbornetIds: neighbornets[0] ? [neighbornets[0].id] : [],
         visitDate: todayIso(),
       };
 
   const [form, setForm] = useState<VisitInput>(initial);
   const [coPick, setCoPick] = useState("");
+  const [nnPick, setNnPick] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null);
+  const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
 
   const memberById = useMemo(
     () => new Map(members.map((m) => [m.id, m.label])),
     [members],
+  );
+  const neighbornetById = useMemo(
+    () => new Map(neighbornets.map((n) => [n.id, n.label])),
+    [neighbornets],
   );
 
   const progress = useMemo(() => {
@@ -94,12 +98,28 @@ export function FeedbackForm({
     setCoPick("");
   }
 
+  function addNeighbornet() {
+    if (!nnPick) return;
+    if (!form.neighbornetIds.includes(nnPick)) {
+      set("neighbornetIds", [...form.neighbornetIds, nnPick]);
+    }
+    setNnPick("");
+  }
+
+  function removeNeighbornet(id: string) {
+    if (form.neighbornetIds.length <= 1) return;
+    set(
+      "neighbornetIds",
+      form.neighbornetIds.filter((x) => x !== id),
+    );
+  }
+
   function handleResult(
     res: Awaited<ReturnType<typeof submitFeedback>>,
     successMsg: string,
   ) {
     if (res.ok) {
-      setDuplicate(null);
+      setDuplicates([]);
       setError(null);
       if (editing) {
         setNotice("Submission updated.");
@@ -107,7 +127,7 @@ export function FeedbackForm({
       } else {
         setForm({
           ...EMPTY_VISIT_INPUT,
-          neighbornetId: neighbornets[0]?.id ?? "",
+          neighbornetIds: neighbornets[0] ? [neighbornets[0].id] : [],
           visitDate: todayIso(),
         });
         setNotice(successMsg);
@@ -115,8 +135,8 @@ export function FeedbackForm({
       router.refresh();
       return;
     }
-    if ("duplicate" in res) {
-      setDuplicate(res.duplicate);
+    if ("duplicates" in res) {
+      setDuplicates(res.duplicates);
       return;
     }
     setError(res.error);
@@ -126,7 +146,7 @@ export function FeedbackForm({
     e.preventDefault();
     setError(null);
     setNotice(null);
-    setDuplicate(null);
+    setDuplicates([]);
     if (!form.notes.trim()) {
       setError("The feedback paragraph is required to submit.");
       return;
@@ -140,15 +160,12 @@ export function FeedbackForm({
   }
 
   function resolveDuplicate(mode: "link" | "separate") {
-    if (!duplicate) return;
+    if (!duplicates.length) return;
     startTransition(async () => {
-      const res =
-        mode === "link"
-          ? await linkToExistingVisit(duplicate.visitId, form)
-          : await submitSeparateVisit(form);
+      const res = await resolveJointDuplicates(form, duplicates, mode);
       handleResult(
         res,
-        mode === "link" ? "Linked to the existing visit." : "Feedback submitted.",
+        mode === "link" ? "Linked to the existing visit(s)." : "Feedback submitted.",
       );
     });
   }
@@ -193,13 +210,22 @@ export function FeedbackForm({
         </div>
       </div>
 
-      {duplicate && (
+      {duplicates.length > 0 && (
         <div className="duplicate-banner">
-          <div className="dup-title">A visit already exists for this date</div>
+          <div className="dup-title">
+            {duplicates.length > 1
+              ? "Visits already exist for this date"
+              : "A visit already exists for this date"}
+          </div>
           <div className="dup-desc">
-            {duplicate.submittedByName} already logged a visit to{" "}
-            {duplicate.neighbornetName} on {duplicate.visitDate}. Link yours to
-            it instead of counting a separate visit?
+            {duplicates.map((d) => (
+              <div key={d.neighbornetId}>
+                {d.submittedByName} already logged a visit to{" "}
+                {d.neighbornetName} on {d.visitDate}.
+              </div>
+            ))}
+            Link yours to the existing one(s) instead of counting separate
+            visits? Any other neighbornet you picked still gets logged fresh.
           </div>
           <div className="dup-actions">
             <button
@@ -243,12 +269,12 @@ export function FeedbackForm({
             </div>
           </div>
 
-          <div className="form-grid">
-            <div className="field">
+          {editing ? (
+            <div className="field full">
               <label>Neighbornet</label>
               <select
-                value={form.neighbornetId}
-                onChange={(e) => set("neighbornetId", e.target.value)}
+                value={form.neighbornetIds[0] ?? ""}
+                onChange={(e) => set("neighbornetIds", [e.target.value])}
                 required
               >
                 {neighbornets.map((n) => (
@@ -258,6 +284,64 @@ export function FeedbackForm({
                 ))}
               </select>
             </div>
+          ) : (
+            <div className="field full">
+              <label>
+                Neighbornet(s){" "}
+                <span className="optional-tag">
+                  add more than one if this was a joint event
+                </span>
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <select
+                  value={nnPick}
+                  onChange={(e) => setNnPick(e.target.value)}
+                >
+                  <option value="">Add another neighbornet…</option>
+                  {neighbornets
+                    .filter((n) => !form.neighbornetIds.includes(n.id))
+                    .map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.label}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  style={{ flexShrink: 0 }}
+                  onClick={addNeighbornet}
+                >
+                  Add
+                </button>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 8,
+                }}
+              >
+                {form.neighbornetIds.map((id) => (
+                  <span className="chip" key={id}>
+                    {neighbornetById.get(id) ?? "Unknown"}
+                    {form.neighbornetIds.length > 1 && (
+                      <button
+                        type="button"
+                        className="chip-remove"
+                        onClick={() => removeNeighbornet(id)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="form-grid">
             <div className="field">
               <label>Visit date</label>
               <input

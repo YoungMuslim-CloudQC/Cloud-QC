@@ -96,6 +96,14 @@ model User {
   // rather than defaulting to everything.
   digestSubAreas String[] @default([])
 
+  // The one specific neighbornet this user represents on the leaderboard —
+  // distinct from homeRegion/homeSubArea above (a broad area, not a FK).
+  // Cleared automatically if that neighbornet is ever deleted. Column exists
+  // on the shared DB from the leaderboard branch; modeled here too so this
+  // branch's migration history matches reality (no leaderboard UI implied).
+  representingNeighbornetId String?
+  representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
+
   accounts            Account[]
   sessions            Session[]
   submittedVisits     Visit[]              @relation("VisitSubmittedBy")
@@ -108,6 +116,7 @@ model User {
   neighbornetsArchived Neighbornet[]       @relation("NeighbornetArchivedBy")
 
   @@index([status])
+  @@index([representingNeighbornetId])
 }
 
 // Auth.js standard adapter model
@@ -181,6 +190,7 @@ model Neighbornet {
 
   visits      Visit[]
   rotations   RotationAssignment[]
+  representedBy User[] @relation("UserRepresents")
 
   @@index([stateCode])
   @@index([region, subArea])
@@ -206,6 +216,11 @@ model Visit {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
+  // Set (to a shared value) when one submission covers a joint event across
+  // multiple neighbornets — one Visit row per neighbornet, linked by this id.
+  // Null for an ordinary single-neighbornet visit.
+  jointEventId String?
+
   neighbornetId String
   neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
 
@@ -219,6 +234,7 @@ model Visit {
   @@index([neighbornetId, visitDate])
   @@index([submittedById])
   @@index([deletedAt])
+  @@index([jointEventId])
 }
 
 // Append-only audit log — one row per create / edit / delete / restore of a

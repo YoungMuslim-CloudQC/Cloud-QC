@@ -13,6 +13,7 @@ import {
 import {
   visitInputSchema,
   type VisitInput,
+  type DuplicateInfo,
   type SubmitResult,
 } from "@/lib/visit-schema";
 
@@ -77,10 +78,16 @@ async function loadModifiableVisit(
   return { ok: true, visit };
 }
 
-async function createVisit(userId: string, input: VisitInput) {
+async function createVisit(
+  userId: string,
+  input: VisitInput,
+  neighbornetId: string,
+  jointEventId: string | null,
+) {
   const visit = await db.visit.create({
     data: {
-      neighbornetId: input.neighbornetId,
+      neighbornetId,
+      jointEventId,
       visitDate: new Date(`${input.visitDate}T00:00:00.000Z`),
       submittedById: userId,
       groupSize: input.groupSize,
@@ -108,97 +115,43 @@ async function createVisit(userId: string, input: VisitInput) {
   return visit;
 }
 
-/**
- * Primary submit. Returns a `duplicate` result if someone else already logged
- * a visit to the same neighbornet on the same date and the caller isn't on it.
- */
-export async function submitFeedback(raw: VisitInput): Promise<SubmitResult> {
-  const user = await assertApproved();
-  const parsed = visitInputSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+/** One Visit per neighbornet; if there's more than one, they're linked as a
+ *  joint event so it's clear later they were the same underlying gathering. */
+async function createVisitsForNeighbornets(
+  userId: string,
+  input: VisitInput,
+  neighbornetIds: string[],
+) {
+  const jointEventId = neighbornetIds.length > 1 ? crypto.randomUUID() : null;
+  const created: string[] = [];
+  for (const nnId of neighbornetIds) {
+    const visit = await createVisit(userId, input, nnId, jointEventId);
+    created.push(visit.id);
   }
-  const input = parsed.data;
-
-  const nn = await db.neighbornet.findUnique({
-    where: { id: input.neighbornetId },
-    select: { id: true, name: true, archivedAt: true },
-  });
-  if (!nn) {
-    return { ok: false, error: "That neighbornet doesn't exist." };
-  }
-  if (nn.archivedAt) {
-    return { ok: false, error: "That neighbornet is archived." };
-  }
-
-  const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
-  const existing = await db.visit.findFirst({
-    where: {
-      neighbornetId: input.neighbornetId,
-      visitDate,
-      deletedAt: null,
-      submittedById: { not: user.id },
-      participants: { none: { userId: user.id } },
-    },
-    include: { submittedBy: { select: { name: true, email: true } } },
-  });
-
-  if (existing) {
-    return {
-      ok: false,
-      duplicate: {
-        visitId: existing.id,
-        submittedByName: memberName(existing.submittedBy),
-        neighbornetName: nn.name,
-        visitDate: input.visitDate,
-      },
-    };
-  }
-
-  const visit = await createVisit(user.id, input);
-  revalidateVisitViews();
-  return { ok: true, visitId: visit.id };
+  return created;
 }
 
-/** "Submit as a separate visit" after a duplicate prompt. */
-export async function submitSeparateVisit(raw: VisitInput): Promise<SubmitResult> {
-  const user = await assertApproved();
-  const parsed = visitInputSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-  const visit = await createVisit(user.id, parsed.data);
-  revalidateVisitViews();
-  return { ok: true, visitId: visit.id };
-}
-
-/** "Link my visit" — join an existing visit as a co-visitor. */
-export async function linkToExistingVisit(
+/** Add the current user (and any co-visitors named in `input`) as
+ *  participants on an already-existing visit, rather than logging a new one.
+ *  Returns null if the visit is gone or deleted. */
+async function joinVisitAsCoVisitor(
   existingVisitId: string,
-  raw: VisitInput,
-): Promise<SubmitResult> {
-  const user = await assertApproved();
-  const parsed = visitInputSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-  const input = parsed.data;
-
+  userId: string,
+  input: VisitInput,
+) {
   const visit = await db.visit.findUnique({
     where: { id: existingVisitId },
     include: { participants: { select: { userId: true } } },
   });
-  if (!visit || visit.deletedAt) {
-    return { ok: false, error: "That visit no longer exists." };
-  }
+  if (!visit || visit.deletedAt) return null;
 
   const present = new Set(visit.participants.map((p) => p.userId));
   present.add(visit.submittedById);
 
   const toAdd: { userId: string; role: "CO_VISITOR"; contributed: boolean }[] = [];
-  if (!present.has(user.id)) {
-    toAdd.push({ userId: user.id, role: "CO_VISITOR", contributed: true });
-    present.add(user.id);
+  if (!present.has(userId)) {
+    toAdd.push({ userId, role: "CO_VISITOR", contributed: true });
+    present.add(userId);
   }
   for (const id of input.coVisitorIds) {
     if (!present.has(id)) {
@@ -218,15 +171,155 @@ export async function linkToExistingVisit(
     ...(input.notes
       ? [
           db.visitComment.create({
-            data: { visitId: visit.id, authorId: user.id, body: input.notes },
+            data: { visitId: visit.id, authorId: userId, body: input.notes },
           }),
         ]
       : []),
   ]);
 
-  await recordHistory(visit.id, "EDITED", user.id);
+  await recordHistory(visit.id, "EDITED", userId);
+  return visit.id;
+}
+
+/**
+ * Primary submit. Returns `duplicates` (one entry per conflicting
+ * neighbornet) if someone else already logged a visit to any of the selected
+ * neighbornets on the same date and the caller isn't on it.
+ */
+export async function submitFeedback(raw: VisitInput): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const parsed = visitInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const input = parsed.data;
+
+  const nns = await db.neighbornet.findMany({
+    where: { id: { in: input.neighbornetIds } },
+    select: { id: true, name: true, archivedAt: true },
+  });
+  if (nns.length !== input.neighbornetIds.length) {
+    return { ok: false, error: "One of the selected neighbornets doesn't exist." };
+  }
+  const archived = nns.find((n) => n.archivedAt);
+  if (archived) {
+    return { ok: false, error: `${archived.name} is archived.` };
+  }
+
+  const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
+  const duplicates: DuplicateInfo[] = [];
+  for (const nn of nns) {
+    const existing = await db.visit.findFirst({
+      where: {
+        neighbornetId: nn.id,
+        visitDate,
+        deletedAt: null,
+        submittedById: { not: user.id },
+        participants: { none: { userId: user.id } },
+      },
+      include: { submittedBy: { select: { name: true, email: true } } },
+    });
+    if (existing) {
+      duplicates.push({
+        visitId: existing.id,
+        neighbornetId: nn.id,
+        submittedByName: memberName(existing.submittedBy),
+        neighbornetName: nn.name,
+        visitDate: input.visitDate,
+      });
+    }
+  }
+  if (duplicates.length) {
+    return { ok: false, duplicates };
+  }
+
+  const created = await createVisitsForNeighbornets(
+    user.id,
+    input,
+    input.neighbornetIds,
+  );
   revalidateVisitViews();
-  return { ok: true, visitId: visit.id };
+  return { ok: true, visitId: created[0] };
+}
+
+/** "Submit as separate visit(s)" after a duplicate prompt — ignores whatever
+ *  conflicts were found and logs a fresh visit for every selected neighbornet. */
+export async function submitSeparateVisit(raw: VisitInput): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const parsed = visitInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const created = await createVisitsForNeighbornets(
+    user.id,
+    parsed.data,
+    parsed.data.neighbornetIds,
+  );
+  revalidateVisitViews();
+  return { ok: true, visitId: created[0] };
+}
+
+/** "Link my visit" — join an existing visit as a co-visitor. */
+export async function linkToExistingVisit(
+  existingVisitId: string,
+  raw: VisitInput,
+): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const parsed = visitInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const joined = await joinVisitAsCoVisitor(existingVisitId, user.id, parsed.data);
+  if (!joined) {
+    return { ok: false, error: "That visit no longer exists." };
+  }
+  revalidateVisitViews();
+  return { ok: true, visitId: joined };
+}
+
+/**
+ * Resolve a duplicate-prompt for a (possibly multi-neighbornet) submission.
+ * "link" joins each conflicting neighbornet's existing visit as a co-visitor
+ * and still creates fresh visits for any neighbornet that didn't conflict;
+ * "separate" just logs a new visit for every selected neighbornet.
+ */
+export async function resolveJointDuplicates(
+  raw: VisitInput,
+  duplicates: DuplicateInfo[],
+  mode: "link" | "separate",
+): Promise<SubmitResult> {
+  const user = await assertApproved();
+  const parsed = visitInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const input = parsed.data;
+
+  if (mode === "separate") {
+    const created = await createVisitsForNeighbornets(
+      user.id,
+      input,
+      input.neighbornetIds,
+    );
+    revalidateVisitViews();
+    return { ok: true, visitId: created[0] };
+  }
+
+  const dupByNn = new Map(duplicates.map((d) => [d.neighbornetId, d.visitId]));
+  const jointEventId = input.neighbornetIds.length > 1 ? crypto.randomUUID() : null;
+  const created: string[] = [];
+  for (const nnId of input.neighbornetIds) {
+    const existingVisitId = dupByNn.get(nnId);
+    if (existingVisitId) {
+      const joined = await joinVisitAsCoVisitor(existingVisitId, user.id, input);
+      if (joined) created.push(joined);
+    } else {
+      const visit = await createVisit(user.id, input, nnId, jointEventId);
+      created.push(visit.id);
+    }
+  }
+  revalidateVisitViews();
+  return { ok: true, visitId: created[0] };
 }
 
 /** Edit a visit (original submitter, or an admin). */
@@ -240,6 +333,12 @@ export async function updateFeedback(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const input = parsed.data;
+  if (input.neighbornetIds.length !== 1) {
+    return {
+      ok: false,
+      error: "Editing only supports one neighbornet — resubmit a new entry for a joint event.",
+    };
+  }
 
   const loaded = await loadModifiableVisit(
     visitId,
@@ -267,7 +366,7 @@ export async function updateFeedback(
     db.visit.update({
       where: { id: visitId },
       data: {
-        neighbornetId: input.neighbornetId,
+        neighbornetId: input.neighbornetIds[0],
         visitDate: new Date(`${input.visitDate}T00:00:00.000Z`),
         groupSize: input.groupSize,
         avgAge: input.avgAge,
