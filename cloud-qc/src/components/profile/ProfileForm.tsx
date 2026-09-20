@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { updateProfile, type ProfileState } from "@/server/actions/profile";
@@ -41,6 +41,8 @@ function applyThemePreview(theme: ThemeKey) {
   document.documentElement.dataset.theme = theme;
 }
 
+type NeighbornetOption = { id: string; name: string; region: string; subArea: string | null };
+
 export function ProfileForm({
   name,
   image,
@@ -53,6 +55,8 @@ export function ProfileForm({
   homeSubArea,
   digestSubAreas,
   regionMap,
+  representingNeighbornetId,
+  neighbornetOptions,
 }: {
   name: string;
   image: string | null;
@@ -65,6 +69,8 @@ export function ProfileForm({
   homeSubArea: string | null;
   digestSubAreas: string[];
   regionMap: RegionMap;
+  representingNeighbornetId: string | null;
+  neighbornetOptions: NeighbornetOption[];
 }) {
   const [state, formAction, pending] = useActionState(updateProfile, INITIAL);
   const { update: updateSession } = useSession();
@@ -79,8 +85,20 @@ export function ProfileForm({
   const [homeRegionValue, setHomeRegionValue] = useState(homeRegion ?? "");
   const [homeSubAreaValue, setHomeSubAreaValue] = useState(homeSubArea ?? "");
   const [subAreaPicks, setSubAreaPicks] = useState<Set<string>>(new Set(digestSubAreas));
+  const [representingId, setRepresentingId] = useState(representingNeighbornetId ?? "");
 
   const homeSubAreaOptions = regionMap.find((r) => r.region === homeRegionValue)?.subAreas ?? [];
+
+  const neighbornetGroups = useMemo(() => {
+    const byGroup = new Map<string, NeighbornetOption[]>();
+    for (const n of neighbornetOptions) {
+      const key = n.subArea ? `${n.region} — ${n.subArea}` : n.region;
+      const list = byGroup.get(key) ?? [];
+      list.push(n);
+      byGroup.set(key, list);
+    }
+    return [...byGroup.entries()];
+  }, [neighbornetOptions]);
 
   function toggleSubArea(subArea: string) {
     setSubAreaPicks((prev) => {
@@ -203,6 +221,32 @@ export function ProfileForm({
         <div className="survey-time-note">
           Where you&rsquo;re from — this is the default for which
           neighbornets your digest covers, below.
+        </div>
+      </div>
+
+      <div className="field">
+        <label>
+          Representing <span className="optional-tag">optional</span>
+        </label>
+        <select
+          name="representingNeighbornetId"
+          value={representingId}
+          onChange={(e) => setRepresentingId(e.target.value)}
+        >
+          <option value="">No neighbornet chosen</option>
+          {neighbornetGroups.map(([groupLabel, options]) => (
+            <optgroup key={groupLabel} label={groupLabel}>
+              {options.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <div className="survey-time-note">
+          The one neighbornet you represent — shown next to your name on the
+          Cloud Team leaderboard.
         </div>
       </div>
 

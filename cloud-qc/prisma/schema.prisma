@@ -98,9 +98,7 @@ model User {
 
   // The one specific neighbornet this user represents on the leaderboard —
   // distinct from homeRegion/homeSubArea above (a broad area, not a FK).
-  // Cleared automatically if that neighbornet is ever deleted. Column exists
-  // on the shared DB from the leaderboard branch; modeled here too so this
-  // branch's migration history matches reality (no leaderboard UI implied).
+  // Cleared automatically if that neighbornet is ever deleted.
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
