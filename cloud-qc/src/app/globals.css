@@ -2167,3 +2167,220 @@ tr:last-child td {
     transform: translateY(0);
   }
 }
+
+/* ================= SITE FEEDBACK WIDGET ================= */
+.sf-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body), "Inter", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.sf-fab:hover {
+  border-color: var(--secondary);
+}
+.sf-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10001;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--success-bg);
+  border: 1px solid var(--success);
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+}
+.sf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sf-overlay.is-selecting {
+  cursor: crosshair;
+  background: rgba(0, 0, 0, 0.28);
+}
+.sf-box {
+  position: absolute;
+  border: 2px solid #facc15;
+  background: rgba(250, 204, 21, 0.12);
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+.sf-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  cursor: default;
+  /* Click-through: a drag may start underneath it; only the buttons catch taps. */
+  pointer-events: none;
+}
+.sf-banner-sub {
+  color: var(--text-muted);
+}
+.sf-banner-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.sf-banner-actions button {
+  pointer-events: auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.sf-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.sf-panel.on-top {
+  bottom: auto;
+  top: 16px;
+}
+.sf-panel-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--heading);
+  margin-bottom: 2px;
+}
+.sf-panel label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.sf-panel textarea {
+  min-height: 64px;
+}
+.sf-panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .sf-banner {
+    top: 8px;
+    padding: 7px 10px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .sf-banner-sub {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  /* Sit above the bottom tab bar on phones. */
+  .sf-fab,
+  .sf-toast {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+  }
+}
+@media print {
+  .sf-fab,
+  .sf-toast,
+  .sf-overlay {
+    display: none !important;
+  }
+}
+
+/* Admin: site feedback inbox items. */
+.sf-item-path {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.sf-item-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+.sf-item-body {
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  margin-top: 2px;
+}
+.sf-item-quote {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-top: 2px;
+}
+.sf-item-shot {
+  display: block;
+  max-width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.sf-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sf-item-meta code {
+  font-family: var(--font-mono), monospace;
+  word-break: break-all;
+}

@@ -18,6 +18,10 @@ datasource db {
 enum Role {
   MEMBER
   ADMIN
+  // Runs a neighbornet rather than QC-ing them: signs in to a read-only inbox
+  // of the feedback logged about the neighbornet(s) linked in
+  // NeighbornetCoordinator. Blocked from every member screen.
+  COORDINATOR
 }
 
 enum AccountStatus {
@@ -38,6 +42,11 @@ enum VisitEventType {
   VISIT
   BASH
   SR_EVENT
+}
+
+enum SiteFeedbackStatus {
+  NEW
+  RESOLVED
 }
 
 enum ParticipantRole {
@@ -109,6 +118,9 @@ model User {
   // Cleared automatically if that neighbornet is ever deleted.
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
+
+  coordinates         NeighbornetCoordinator[]
+  siteFeedback        SiteFeedback[]
 
   accounts            Account[]
   sessions            Session[]
@@ -197,10 +209,51 @@ model Neighbornet {
   visits      Visit[]
   rotations   RotationAssignment[]
   representedBy User[] @relation("UserRepresents")
+  coordinators  NeighbornetCoordinator[]
 
   @@index([stateCode])
   @@index([region, subArea])
   @@index([archivedAt])
+}
+
+// Which neighbornet(s) a COORDINATOR user runs. Set by an admin, or claimed at
+// signup (and confirmed when the admin approves the account).
+model NeighbornetCoordinator {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, neighbornetId])
+  @@index([neighbornetId])
+}
+
+// Feedback about the Cloud QC site itself, left from any page: the person
+// highlights part of the screen and says what's wrong / how to improve it.
+model SiteFeedback {
+  id         String             @id @default(cuid())
+  createdAt  DateTime           @default(now())
+  status     SiteFeedbackStatus @default(NEW)
+  resolvedAt DateTime?
+
+  path       String // pathname + query of the page it was left on
+  problem    String // what's wrong
+  suggestion String? // how it could improve
+  // Where on the page: { selector, text, rect:{x,y,w,h} (document px),
+  // viewport:{w,h}, scrollY, userAgent, theme }.
+  context    Json?
+  // JPEG data URL of the highlighted area. Best-effort — absent if the
+  // capture failed. Served by /admin/site-feedback/<id>/screenshot.
+  screenshot String?            @db.Text
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
 }
 
 // ---------------------------------------------------------------------------

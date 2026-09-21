@@ -1,6 +1,6 @@
 import "server-only";
 
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 
@@ -9,7 +9,7 @@ export type SessionUser = {
   name?: string | null;
   email?: string | null;
   image?: string | null;
-  role: "MEMBER" | "ADMIN";
+  role: "MEMBER" | "ADMIN" | "COORDINATOR";
   status: "PENDING" | "APPROVED" | "REJECTED";
   theme: string;
 };
@@ -25,6 +25,9 @@ export async function requireApproved(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   if (user.status !== "APPROVED") redirect("/pending");
+  // Coordinator accounts exist in the shared database, but this build has no
+  // coordinator screens — never let one fall through to member access.
+  if (user.role !== "MEMBER" && user.role !== "ADMIN") notFound();
   return user;
 }
 
@@ -43,6 +46,9 @@ export async function assertApproved(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user || user.status !== "APPROVED") {
     throw new Error("Unauthorized");
+  }
+  if (user.role !== "MEMBER" && user.role !== "ADMIN") {
+    throw new Error("Forbidden: unsupported account type");
   }
   return user;
 }

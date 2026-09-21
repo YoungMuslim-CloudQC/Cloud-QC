@@ -1,6 +1,6 @@
 import type { DefaultSession } from "next-auth";
 
-type UserRole = "MEMBER" | "ADMIN";
+type UserRole = "MEMBER" | "ADMIN" | "COORDINATOR";
 type UserStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 declare module "next-auth" {

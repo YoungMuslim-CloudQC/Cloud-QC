@@ -9,6 +9,7 @@ import { CloudMark } from "@/components/Brand";
 import { Avatar } from "@/components/Avatar";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { SignOutButton } from "@/components/SignOutButton";
+import { SiteFeedbackWidget } from "@/components/site-feedback/SiteFeedbackWidget";
 
 export default async function AppLayout({
   children,
@@ -53,6 +54,8 @@ export default async function AppLayout({
       <MobileNav isAdmin={isAdmin} />
 
       <main className="main">{children}</main>
+
+      <SiteFeedbackWidget />
     </div>
   );
 }

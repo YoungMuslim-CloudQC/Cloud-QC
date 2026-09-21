@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [pending, all, settings] = await Promise.all([
+  const [pending, all, settings, newSiteFeedback] = await Promise.all([
     db.user.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -21,6 +21,7 @@ export default async function AdminPage() {
       orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
     getSettings(),
+    db.siteFeedback.count({ where: { status: "NEW" } }),
   ]);
 
   return (
@@ -36,6 +37,17 @@ export default async function AdminPage() {
           manualOffset={settings.manualOffset}
           goal={settings.goal}
         />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Site feedback</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          Comments members leave on any page with the &ldquo;Improve this page&rdquo;
+          button, including the part of the screen they highlighted.
+        </p>
+        <Link className="btn btn-secondary btn-small" href="/admin/site-feedback">
+          Open site feedback{newSiteFeedback > 0 ? ` (${newSiteFeedback} new)` : ""}
+        </Link>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
