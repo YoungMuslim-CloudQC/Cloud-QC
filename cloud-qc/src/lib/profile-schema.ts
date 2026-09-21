@@ -9,7 +9,7 @@ export const THEMES = [
   { key: "paper", label: "Paper", blurb: "Plain white, easy on the eyes", bg: "#f5f5f8" },
   { key: "onyx", label: "Onyx", blurb: "Plain black & gray", bg: "#050505" },
   { key: "aurora", label: "Aurora", blurb: "Teal & emerald", bg: "#061615" },
-  { key: "sepia", label: "Sepia", blurb: "Tan & brown, dark and warm", bg: "#1a1410" },
+  { key: "sepia", label: "Sepia", blurb: "Tan & brown, warm and soft", bg: "#2b2219" },
   { key: "nocturne", label: "Nocturne", blurb: "Blue & violet", bg: "#060a18" },
   { key: "crimson", label: "Crimson", blurb: "Red & orange", bg: "#170808" },
   { key: "citrus", label: "Citrus", blurb: "Lime & yellow", bg: "#0f1408" },

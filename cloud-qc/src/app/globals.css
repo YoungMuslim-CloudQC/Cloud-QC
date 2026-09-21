@@ -127,26 +127,26 @@
 /* Sepia — tan & brown on a warm dark background. Paper's dark, "aged
    paper at night" counterpart — muted rather than vibrant on purpose. */
 [data-theme="sepia"] {
-  --bg: #1a1410;
-  --surface: #241c15;
-  --surface-2: #2e251a;
+  --bg: #2b2219;
+  --surface: #382d22;
+  --surface-2: #45382b;
   --primary: #d4a373;
   --primary-dim: #c08552;
   --primary-bright: #e6c19c;
   --primary-deep: #8b5e34;
   --secondary: #c9a66b;
   --accent: #f0dfc0;
-  --text: #ecdfd0;
-  --text-muted: #a08d76;
-  --border: #3a2f22;
-  --border-soft: #2c2318;
+  --text: #f3e9da;
+  --text-muted: #bba98f;
+  --border: #5a4a38;
+  --border-soft: #4a3c2d;
 
-  --sidebar-grad-1: #14100c;
-  --sidebar-grad-2: #0a0806;
-  --sidebar-text: #d9c9b0;
-  --heading: #f5ead9;
+  --sidebar-grad-1: #33291f;
+  --sidebar-grad-2: #251d15;
+  --sidebar-text: #e2d3ba;
+  --heading: #faf1e2;
   --on-accent: #2c1f0f;
-  --placeholder: #6b5c48;
+  --placeholder: #8a7a64;
   --text-gradient-1: #e6c19c;
   --text-gradient-2: #d4a373;
 
