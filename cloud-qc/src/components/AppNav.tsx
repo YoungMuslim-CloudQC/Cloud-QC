@@ -14,7 +14,8 @@ type NavKey =
   | "team"
   | "rotation"
   | "profile"
-  | "admin";
+  | "admin"
+  | "inbox";
 
 type NavDef = {
   key: NavKey;
@@ -23,10 +24,26 @@ type NavDef = {
   short: string;
   icon: ReactNode;
   admin?: boolean;
+  /** Only coordinators see this; members never do. */
+  coordinatorOnly?: boolean;
   primaryMobile?: boolean;
 };
 
 const NAV: NavDef[] = [
+  {
+    key: "inbox",
+    href: "/coordinator",
+    label: "Feedback inbox",
+    short: "Inbox",
+    coordinatorOnly: true,
+    primaryMobile: true,
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <path d="M3 13l3-8h12l3 8v6H3v-6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M3 13h5l1 3h6l1-3h5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
   {
     key: "dashboard",
     href: "/dashboard",
@@ -133,21 +150,32 @@ const NAV: NavDef[] = [
   },
 ];
 
+type Viewer = { isAdmin: boolean; isCoordinator: boolean };
+
+/** Coordinators get just their inbox + profile; members never see the inbox. */
+function visibleTo(n: NavDef, v: Viewer) {
+  if (v.isCoordinator) return n.key === "inbox" || n.key === "profile";
+  if (n.coordinatorOnly) return false;
+  return !n.admin || v.isAdmin;
+}
+
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function SidebarNav({
   isAdmin,
+  isCoordinator = false,
   pendingCount,
 }: {
   isAdmin: boolean;
+  isCoordinator?: boolean;
   pendingCount: number;
 }) {
   const pathname = usePathname();
   return (
     <nav>
-      {NAV.filter((n) => !n.admin || isAdmin).map((n) => (
+      {NAV.filter((n) => visibleTo(n, { isAdmin, isCoordinator })).map((n) => (
         <Link
           key={n.key}
           href={n.href}
@@ -164,12 +192,19 @@ export function SidebarNav({
   );
 }
 
-export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
+export function MobileNav({
+  isAdmin,
+  isCoordinator = false,
+}: {
+  isAdmin: boolean;
+  isCoordinator?: boolean;
+}) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const primary = NAV.filter((n) => n.primaryMobile);
-  const overflow = NAV.filter((n) => !n.primaryMobile && (!n.admin || isAdmin));
+  const viewer = { isAdmin, isCoordinator };
+  const primary = NAV.filter((n) => n.primaryMobile && visibleTo(n, viewer));
+  const overflow = NAV.filter((n) => !n.primaryMobile && visibleTo(n, viewer));
   const overflowActive = overflow.some((n) => isActive(pathname, n.href));
 
   return (

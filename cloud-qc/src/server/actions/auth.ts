@@ -11,12 +11,19 @@ const signupSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  // Self-declared at signup; ADMIN is never selectable here. An admin still
+  // approves the account (and can correct the role/neighbornets) before it
+  // can sign in, so this is a claim, not a grant.
+  role: z.enum(["MEMBER", "COORDINATOR"]).default("MEMBER"),
+  neighbornetIds: z.array(z.string().min(1)).max(10).default([]),
 });
 
 export type SignupState = {
   ok: boolean;
   error?: string;
-  fieldErrors?: Partial<Record<"name" | "email" | "password", string>>;
+  fieldErrors?: Partial<
+    Record<"name" | "email" | "password" | "neighbornetIds", string>
+  >;
 };
 
 // argon2id params — reasonable defaults for an interactive login.
@@ -34,6 +41,8 @@ export async function signup(
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role") || "MEMBER",
+    neighbornetIds: formData.getAll("neighbornetIds"),
   });
 
   if (!parsed.success) {
@@ -45,11 +54,31 @@ export async function signup(
         name: flat.fieldErrors.name?.[0],
         email: flat.fieldErrors.email?.[0],
         password: flat.fieldErrors.password?.[0],
+        neighbornetIds: flat.fieldErrors.neighbornetIds?.[0],
       },
     };
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role, neighbornetIds } = parsed.data;
+
+  const isCoordinator = role === "COORDINATOR";
+  if (isCoordinator) {
+    if (neighbornetIds.length === 0) {
+      return {
+        ok: false,
+        fieldErrors: { neighbornetIds: "Pick the neighbornet you coordinate." },
+      };
+    }
+    const found = await db.neighbornet.count({
+      where: { id: { in: neighbornetIds }, archivedAt: null },
+    });
+    if (found !== new Set(neighbornetIds).size) {
+      return {
+        ok: false,
+        fieldErrors: { neighbornetIds: "One of those neighbornets isn't available." },
+      };
+    }
+  }
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
@@ -67,8 +96,17 @@ export async function signup(
       name,
       email,
       passwordHash,
-      role: "MEMBER",
+      role: isCoordinator ? "COORDINATOR" : "MEMBER",
       status: "PENDING",
+      ...(isCoordinator
+        ? {
+            coordinates: {
+              create: [...new Set(neighbornetIds)].map((neighbornetId) => ({
+                neighbornetId,
+              })),
+            },
+          }
+        : {}),
     },
   });
 

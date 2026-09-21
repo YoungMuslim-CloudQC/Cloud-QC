@@ -67,7 +67,8 @@ export default {
         token.id = user.id as string;
         token.role = ((user as { role?: string }).role ?? "MEMBER") as
           | "MEMBER"
-          | "ADMIN";
+          | "ADMIN"
+          | "COORDINATOR";
         token.status = ((user as { status?: string }).status ?? "PENDING") as
           | "PENDING"
           | "APPROVED"
@@ -88,7 +89,7 @@ export default {
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "MEMBER" | "ADMIN";
+        session.user.role = token.role as "MEMBER" | "ADMIN" | "COORDINATOR";
         session.user.status = token.status as
           | "PENDING"
           | "APPROVED"

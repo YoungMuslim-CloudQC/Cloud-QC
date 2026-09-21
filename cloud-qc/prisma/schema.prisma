@@ -18,6 +18,10 @@ datasource db {
 enum Role {
   MEMBER
   ADMIN
+  // Runs a neighbornet rather than QC-ing them: signs in to a read-only inbox
+  // of the feedback logged about the neighbornet(s) linked in
+  // NeighbornetCoordinator. Blocked from every member screen.
+  COORDINATOR
 }
 
 enum AccountStatus {
@@ -110,6 +114,8 @@ model User {
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
+  coordinates         NeighbornetCoordinator[]
+
   accounts            Account[]
   sessions            Session[]
   submittedVisits     Visit[]              @relation("VisitSubmittedBy")
@@ -197,10 +203,27 @@ model Neighbornet {
   visits      Visit[]
   rotations   RotationAssignment[]
   representedBy User[] @relation("UserRepresents")
+  coordinators  NeighbornetCoordinator[]
 
   @@index([stateCode])
   @@index([region, subArea])
   @@index([archivedAt])
+}
+
+// Which neighbornet(s) a COORDINATOR user runs. Set by an admin, or claimed at
+// signup (and confirmed when the admin approves the account).
+model NeighbornetCoordinator {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, neighbornetId])
+  @@index([neighbornetId])
 }
 
 // ---------------------------------------------------------------------------

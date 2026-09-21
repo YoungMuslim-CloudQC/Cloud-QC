@@ -170,7 +170,7 @@ export type MemberStat = {
   name: string;
   email: string | null;
   image: string | null;
-  role: "MEMBER" | "ADMIN";
+  role: "MEMBER" | "ADMIN" | "COORDINATOR";
   visitCount: number;
   distinctNeighbornets: number;
   pending: number;
@@ -183,7 +183,7 @@ export type MemberStat = {
 export async function getTeamMemberStats(): Promise<MemberStat[]> {
   const [members, participants] = await Promise.all([
     db.user.findMany({
-      where: { status: "APPROVED" },
+      where: { status: "APPROVED", role: { not: "COORDINATOR" } },
       orderBy: { name: "asc" },
       select: {
         id: true,

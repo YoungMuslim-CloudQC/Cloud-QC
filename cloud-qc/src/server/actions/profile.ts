@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 
-import { assertApproved } from "@/lib/authz";
+import { assertApprovedAny } from "@/lib/authz";
 import { db } from "@/lib/db";
 import {
   profileSchema,
@@ -22,7 +22,8 @@ export async function updateProfile(
   _prev: ProfileState,
   formData: FormData,
 ): Promise<ProfileState> {
-  const me = await assertApproved();
+  const me = await assertApprovedAny();
+  const isCoordinator = me.role === "COORDINATOR";
 
   // Members only pick a sub-region; the state it sits in is derived here so
   // the two can never disagree.
@@ -35,13 +36,17 @@ export async function updateProfile(
   const parsed = profileSchema.safeParse({
     phone: formData.get("phone"),
     theme: formData.get("theme"),
-    digestCadence: formData.get("digestCadence"),
-    notificationChannel: formData.get("notificationChannel"),
-    smsConsent: formData.get("smsConsent"),
-    homeRegion: regionBySubArea.get(pickedSubArea) ?? "",
-    homeSubArea: formData.get("homeSubArea"),
-    digestSubAreas: formData.getAll("digestSubAreas"),
-    representingNeighbornetId: formData.get("representingNeighbornetId"),
+    // Coordinators don't have the QC-only settings, so those are pinned
+    // to "off/none" rather than read from the form.
+    digestCadence: isCoordinator ? "OFF" : formData.get("digestCadence"),
+    notificationChannel: isCoordinator ? "EMAIL" : formData.get("notificationChannel"),
+    smsConsent: isCoordinator ? false : formData.get("smsConsent"),
+    homeRegion: isCoordinator ? "" : (regionBySubArea.get(pickedSubArea) ?? ""),
+    homeSubArea: isCoordinator ? "" : formData.get("homeSubArea"),
+    digestSubAreas: isCoordinator ? [] : formData.getAll("digestSubAreas"),
+    representingNeighbornetId: isCoordinator
+      ? ""
+      : formData.get("representingNeighbornetId"),
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };

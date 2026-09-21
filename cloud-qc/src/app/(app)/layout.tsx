@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { db } from "@/lib/db";
-import { requireApproved } from "@/lib/authz";
+import { requireApprovedAny } from "@/lib/authz";
 
 // Every screen here is behind auth and renders live data.
 export const dynamic = "force-dynamic";
@@ -15,8 +15,9 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requireApproved();
+  const user = await requireApprovedAny();
   const isAdmin = user.role === "ADMIN";
+  const isCoordinator = user.role === "COORDINATOR";
   const pendingCount = isAdmin
     ? await db.user.count({ where: { status: "PENDING" } })
     : 0;
@@ -41,16 +42,21 @@ export default async function AppLayout({
           </span>
         </Link>
 
-        <SidebarNav isAdmin={isAdmin} pendingCount={pendingCount} />
+        <SidebarNav
+          isAdmin={isAdmin}
+          isCoordinator={isCoordinator}
+          pendingCount={pendingCount}
+        />
 
         <SignOutButton />
         <div className="sidebar-footer">
-          {isAdmin ? "Admin access" : "Cloud member"} &middot; signed in as{" "}
+          {isAdmin ? "Admin access" : isCoordinator ? "Coordinator" : "Cloud member"}{" "}
+          &middot; signed in as{" "}
           {user.email}
         </div>
       </aside>
 
-      <MobileNav isAdmin={isAdmin} />
+      <MobileNav isAdmin={isAdmin} isCoordinator={isCoordinator} />
 
       <main className="main">{children}</main>
     </div>
