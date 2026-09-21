@@ -170,7 +170,7 @@ export type MemberStat = {
   name: string;
   email: string | null;
   image: string | null;
-  role: "MEMBER" | "ADMIN";
+  role: "MEMBER" | "ADMIN" | "COORDINATOR";
   visitCount: number;
   distinctNeighbornets: number;
   pending: number;
