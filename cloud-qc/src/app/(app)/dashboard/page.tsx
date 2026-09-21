@@ -127,23 +127,24 @@ export default async function DashboardPage() {
       />
 
       <div className="section-label">Across all of Cloud</div>
-      <div className="two-col">
-        <div className="card">
-          <div className="section-label">Network</div>
-          <div className="orbit-wrap">
-            <Orbit
-              nodes={summaries.map((n) => ({
-                id: n.id,
-                name: n.name,
-                status: n.displayStatus,
-                region: n.region,
-              }))}
-            />
-          </div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="section-label">Network</div>
+        <div className="orbit-wrap">
+          <Orbit
+            nodes={summaries.map((n) => ({
+              id: n.id,
+              name: n.name,
+              status: n.displayStatus,
+              region: n.region,
+              subArea: n.subArea,
+              visitCount: n.visitCount,
+            }))}
+          />
         </div>
-        <div className="card">
-          <div className="section-label">Recent visits</div>
-          {recent.length === 0 ? (
+      </div>
+      <div className="card">
+        <div className="section-label">Recent visits</div>
+        {recent.length === 0 ? (
             <div className="empty-state">
               <strong>No visits logged yet</strong>
               Submit your first QC visit to see it here.
@@ -170,7 +171,6 @@ export default async function DashboardPage() {
               );
             })
           )}
-        </div>
       </div>
 
       <div style={{ marginTop: 24 }}>
