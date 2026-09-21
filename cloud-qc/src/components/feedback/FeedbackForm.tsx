@@ -5,6 +5,8 @@ import { useMemo, useState, useTransition } from "react";
 
 import {
   EMPTY_VISIT_INPUT,
+  EVENT_TYPES,
+  EVENT_TYPE_LABEL,
   VISIT_STATUSES,
   type DuplicateInfo,
   type VisitInput,
@@ -15,8 +17,24 @@ import {
   submitFeedback,
   updateFeedback,
 } from "@/server/actions/visits";
+import type { RegionMap } from "@/lib/queries";
+import { SubRegionSelect } from "@/components/SubRegionSelect";
+import { AREA_ALL, matchesArea, parseArea, subValue } from "@/lib/sub-regions";
 
 type Option = { id: string; label: string };
+type NnOption = {
+  id: string;
+  name: string;
+  subArea: string | null;
+  region: string;
+  label: string;
+};
+
+const EVENT_TYPE_HINT: Record<(typeof EVENT_TYPES)[number], string> = {
+  VISIT: "A normal visit to one or more neighbornets.",
+  BASH: "A bash — sub-regions coming together.",
+  SR_EVENT: "An SR event — an inter-sub-region gathering.",
+};
 
 const STATUS_UI: Record<VisitStatusValue, { label: string; cls: string }> = {
   ON_TRACK: { label: "On track", cls: "sel-ok" },
@@ -36,11 +54,16 @@ function todayIso() {
 
 export function FeedbackForm({
   neighbornets,
+  regionMap,
+  homeSubArea,
   members,
   submitterName,
   editing,
 }: {
-  neighbornets: Option[];
+  neighbornets: NnOption[];
+  regionMap: RegionMap;
+  /** The submitter's profile home — the sub-region the picker starts on. */
+  homeSubArea: string | null;
   members: Option[];
   submitterName: string;
   editing?: { visitId: string; input: VisitInput } | null;
@@ -48,17 +71,21 @@ export function FeedbackForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
+  // No neighbornet is pre-picked: the sub-region filter narrows the list
+  // first, and defaulting to "the first in the catalog" invited mis-logs.
   const initial: VisitInput = editing
     ? editing.input
-    : {
-        ...EMPTY_VISIT_INPUT,
-        neighbornetIds: neighbornets[0] ? [neighbornets[0].id] : [],
-        visitDate: todayIso(),
-      };
+    : { ...EMPTY_VISIT_INPUT, visitDate: todayIso() };
 
   const [form, setForm] = useState<VisitInput>(initial);
   const [coPick, setCoPick] = useState("");
-  const [nnPick, setNnPick] = useState("");
+  const [area, setArea] = useState<string>(() => {
+    if (editing) {
+      const nn = neighbornets.find((n) => n.id === editing.input.neighbornetIds[0]);
+      return nn?.subArea ? subValue(nn.subArea) : AREA_ALL;
+    }
+    return homeSubArea ? subValue(homeSubArea) : AREA_ALL;
+  });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
@@ -98,16 +125,29 @@ export function FeedbackForm({
     setCoPick("");
   }
 
-  function addNeighbornet() {
-    if (!nnPick) return;
-    if (!form.neighbornetIds.includes(nnPick)) {
-      set("neighbornetIds", [...form.neighbornetIds, nnPick]);
+  // In the picker: matches the chosen sub-region, and (when logging several
+  // at once) isn't already picked.
+  const pickable = neighbornets.filter(
+    (n) =>
+      matchesArea(n, area) && (editing || !form.neighbornetIds.includes(n.id)),
+  );
+
+  function pickNeighbornet(id: string) {
+    if (!id) return;
+    if (editing) {
+      set("neighbornetIds", [id]);
+    } else if (!form.neighbornetIds.includes(id)) {
+      set("neighbornetIds", [...form.neighbornetIds, id]);
     }
-    setNnPick("");
+  }
+
+  // For bashes / SR events: pull in everything in the chosen sub-region.
+  function addAllInArea() {
+    const ids = pickable.map((n) => n.id);
+    set("neighbornetIds", [...form.neighbornetIds, ...ids]);
   }
 
   function removeNeighbornet(id: string) {
-    if (form.neighbornetIds.length <= 1) return;
     set(
       "neighbornetIds",
       form.neighbornetIds.filter((x) => x !== id),
@@ -127,7 +167,6 @@ export function FeedbackForm({
       } else {
         setForm({
           ...EMPTY_VISIT_INPUT,
-          neighbornetIds: neighbornets[0] ? [neighbornets[0].id] : [],
           visitDate: todayIso(),
         });
         setNotice(successMsg);
@@ -147,6 +186,10 @@ export function FeedbackForm({
     setError(null);
     setNotice(null);
     setDuplicates([]);
+    if (form.neighbornetIds.length === 0) {
+      setError("Pick at least one neighbornet.");
+      return;
+    }
     if (!form.notes.trim()) {
       setError("The feedback paragraph is required to submit.");
       return;
@@ -269,77 +312,100 @@ export function FeedbackForm({
             </div>
           </div>
 
-          {editing ? (
-            <div className="field full">
-              <label>Neighbornet</label>
+          <div className="field full">
+            <label>What are you logging?</label>
+            <div className="status-options">
+              {EVENT_TYPES.map((t) => (
+                <button
+                  type="button"
+                  key={t}
+                  className={`status-opt${
+                    form.eventType === t ? " sel-ok" : ""
+                  }`}
+                  onClick={() => set("eventType", t)}
+                >
+                  {EVENT_TYPE_LABEL[t]}
+                </button>
+              ))}
+            </div>
+            <div className="survey-time-note" style={{ marginTop: 6 }}>
+              {EVENT_TYPE_HINT[form.eventType]}
+            </div>
+          </div>
+
+          <div className="field full">
+            <label>
+              {editing ? "Neighbornet" : "Neighbornet(s)"}{" "}
+              {!editing && (
+                <span className="optional-tag">
+                  pick more than one if it was a joint event
+                </span>
+              )}
+            </label>
+            <div className="nn-picker-row">
+              <SubRegionSelect
+                regionMap={regionMap}
+                value={area}
+                onChange={setArea}
+                emptyLabel="All sub-regions"
+                allowWholeState
+              />
               <select
-                value={form.neighbornetIds[0] ?? ""}
-                onChange={(e) => set("neighbornetIds", [e.target.value])}
-                required
+                value=""
+                onChange={(e) => pickNeighbornet(e.target.value)}
               >
-                {neighbornets.map((n) => (
+                <option value="">
+                  {pickable.length === 0
+                    ? "No neighbornets here"
+                    : editing
+                      ? "Choose a neighbornet…"
+                      : "Add a neighbornet…"}
+                </option>
+                {pickable.map((n) => (
                   <option key={n.id} value={n.id}>
-                    {n.label}
+                    {parseArea(area).kind === "sub" ? n.name : n.label}
                   </option>
                 ))}
               </select>
             </div>
-          ) : (
-            <div className="field full">
-              <label>
-                Neighbornet(s){" "}
-                <span className="optional-tag">
-                  add more than one if this was a joint event
-                </span>
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <select
-                  value={nnPick}
-                  onChange={(e) => setNnPick(e.target.value)}
-                >
-                  <option value="">Add another neighbornet…</option>
-                  {neighbornets
-                    .filter((n) => !form.neighbornetIds.includes(n.id))
-                    .map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.label}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-small"
-                  style={{ flexShrink: 0 }}
-                  onClick={addNeighbornet}
-                >
-                  Add
-                </button>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  marginTop: 8,
-                }}
+            {!editing && parseArea(area).kind !== "all" && pickable.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-small nn-add-all"
+                onClick={addAllInArea}
               >
-                {form.neighbornetIds.map((id) => (
-                  <span className="chip" key={id}>
-                    {neighbornetById.get(id) ?? "Unknown"}
-                    {form.neighbornetIds.length > 1 && (
-                      <button
-                        type="button"
-                        className="chip-remove"
-                        onClick={() => removeNeighbornet(id)}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </div>
+                Add all {pickable.length} in this sub-region
+              </button>
+            )}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                marginTop: 8,
+              }}
+            >
+              {form.neighbornetIds.map((id) => (
+                <span className="chip" key={id}>
+                  {neighbornetById.get(id) ?? "Unknown"}
+                  {!editing && (
+                    <button
+                      type="button"
+                      className="chip-remove"
+                      onClick={() => removeNeighbornet(id)}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
+              {form.neighbornetIds.length === 0 && (
+                <span className="survey-time-note">
+                  Pick a sub-region, then the neighbornet.
+                </span>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="form-grid">
             <div className="field">

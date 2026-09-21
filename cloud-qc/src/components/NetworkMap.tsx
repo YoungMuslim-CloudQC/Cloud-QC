@@ -13,6 +13,7 @@ import { STATE_NAMES, loadStatesTopo } from "@/lib/us-map";
 export type MapNeighbornet = {
   id: string;
   name: string;
+  city?: string | null;
   subArea: string;
   region: string;
   stateCode: string | null;
@@ -262,7 +263,7 @@ function DetailPanel({
       <div
         style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 }}
       >
-        {n.subArea}
+        {[n.city, n.subArea].filter(Boolean).join(" · ")}
       </div>
       <div style={{ marginBottom: 10 }}>
         <span className={`badge ${muted ? "badge-neutral" : meta.cls}`}>
@@ -372,6 +373,8 @@ export function NetworkMap({
     statesGeo?.features.find(
       (f) => (f.properties as { name?: string } | null)?.name === fullName,
     ) ?? null;
+  // Canadian neighbornets have no US state, so they can't sit on a state map.
+  const outsideUs = neighbornets.filter((n) => !n.stateCode);
   const statePoints = withCoords.filter(
     (n) => (n.stateCode || "").toUpperCase() === effectiveState,
   );
@@ -436,6 +439,13 @@ export function NetworkMap({
           <DetailPanel n={selected} muted={muted} />
         </div>
       </div>
+
+      {outsideUs.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <div className="section-label">Outside the US</div>
+          <RegionFallback neighbornets={outsideUs} muted={muted} />
+        </div>
+      )}
     </>
   );
 }

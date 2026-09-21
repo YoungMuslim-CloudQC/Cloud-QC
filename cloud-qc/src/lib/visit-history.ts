@@ -7,6 +7,7 @@ export type VisitSnapshot = {
   neighbornetId: string;
   neighbornetName: string;
   visitDate: string; // YYYY-MM-DD
+  eventType?: string; // absent on snapshots taken before event types existed
   groupSize: number | null;
   avgAge: number | null;
   foodRating: number | null;
@@ -26,6 +27,7 @@ const nameOf = (u: Named) => u.name || u.email || "Member";
 export type VisitForSnapshot = {
   neighbornetId: string;
   neighbornet: { name: string };
+  eventType?: string;
   visitDate: Date | string;
   groupSize: number | null;
   avgAge: number | null;
@@ -49,6 +51,7 @@ export function buildVisitSnapshot(visit: VisitForSnapshot): VisitSnapshot {
     neighbornetId: visit.neighbornetId,
     neighbornetName: visit.neighbornet.name,
     visitDate: isoDate(visit.visitDate),
+    eventType: visit.eventType,
     groupSize: visit.groupSize,
     avgAge: visit.avgAge,
     foodRating: visit.foodRating,

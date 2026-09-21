@@ -1,10 +1,18 @@
 import Link from "next/link";
 
 import { db } from "@/lib/db";
+import { areaWhere, parseArea } from "@/lib/sub-regions";
 
-export async function NeighbornetList({ activeId }: { activeId?: string }) {
+export async function NeighbornetList({
+  activeId,
+  area = "",
+}: {
+  activeId?: string;
+  /** Sub-region filter value (see lib/sub-regions). "" = every neighbornet. */
+  area?: string;
+}) {
   const neighbornets = await db.neighbornet.findMany({
-    where: { archivedAt: null },
+    where: { archivedAt: null, ...areaWhere(area) },
     orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
     select: { id: true, name: true, subArea: true },
   });
@@ -13,21 +21,24 @@ export async function NeighbornetList({ activeId }: { activeId?: string }) {
     return (
       <div className="empty-state">
         <strong>Nothing here yet</strong>
-        An admin needs to add the first neighbornet.
+        No neighbornets in this sub-region.
       </div>
     );
   }
+
+  const singleSub = parseArea(area).kind === "sub";
+  const query = `?area=${encodeURIComponent(area)}`;
 
   return (
     <div className="nn-select-list">
       {neighbornets.map((n) => (
         <Link
           key={n.id}
-          href={`/neighbornets/${n.id}`}
+          href={`/neighbornets/${n.id}${query}`}
           className={`nn-select-item${n.id === activeId ? " active" : ""}`}
         >
           <div className="nsi-name">{n.name}</div>
-          <div className="nsi-city">{n.subArea}</div>
+          {!singleSub && <div className="nsi-city">{n.subArea}</div>}
         </Link>
       ))}
     </div>

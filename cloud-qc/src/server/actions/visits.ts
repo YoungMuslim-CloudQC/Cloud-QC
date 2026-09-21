@@ -88,6 +88,7 @@ async function createVisit(
     data: {
       neighbornetId,
       jointEventId,
+      eventType: input.eventType,
       visitDate: new Date(`${input.visitDate}T00:00:00.000Z`),
       submittedById: userId,
       groupSize: input.groupSize,
@@ -367,6 +368,7 @@ export async function updateFeedback(
       where: { id: visitId },
       data: {
         neighbornetId: input.neighbornetIds[0],
+        eventType: input.eventType,
         visitDate: new Date(`${input.visitDate}T00:00:00.000Z`),
         groupSize: input.groupSize,
         avgAge: input.avgAge,

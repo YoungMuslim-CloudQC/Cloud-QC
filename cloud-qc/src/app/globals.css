@@ -1614,6 +1614,62 @@ tr:last-child td {
   color: var(--text-muted);
 }
 
+/* Sub-region + neighbornet pickers side by side (stacked on phones). */
+.nn-picker-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.nn-add-all {
+  margin-top: 8px;
+  width: auto;
+}
+@media (max-width: 600px) {
+  .nn-picker-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sub-region step on the Neighbornets pages + its feedback feed. */
+.area-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.area-picker label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.feed-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.feed-row:last-of-type {
+  border-bottom: none;
+}
+.feed-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.feed-row-note {
+  font-size: 12.5px;
+  color: var(--text);
+  margin: 4px 0 2px;
+  white-space: pre-wrap;
+}
+
+/* Bash / SR event label — distinct from the status badges. */
+.badge-event {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+}
+
 /* ================= DASHBOARD ORBIT ================= */
 /* Reuses .region-pick-grid/.region-pick-heading/.region-pick-item (defined
    above, for /profile's region picker) for the sub-area toggle checkboxes —

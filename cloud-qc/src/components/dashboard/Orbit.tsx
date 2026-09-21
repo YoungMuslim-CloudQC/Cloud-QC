@@ -13,10 +13,6 @@ type OrbitNode = {
   visitCount: number;
 };
 
-// Fixed display order for the regions we know about; anything unrecognized
-// (shouldn't happen, but data can surprise you) is appended after.
-const REGION_ORDER = ["Northeast", "Southeast", "Texas", "Midwest", "West"];
-
 /** Small stable hash so each node's animation timing looks random but never
  *  changes between renders (avoids hydration mismatches Math.random() would
  *  cause, and keeps a given neighbornet "wiggling" the same way every time). */
@@ -104,11 +100,8 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
       if (!n.subArea) continue;
       bySubArea.set(n.subArea, { region: n.region, subArea: n.subArea });
     }
-    const known = REGION_ORDER.filter((r) => [...bySubArea.values()].some((s) => s.region === r));
-    const unknown = [...new Set([...bySubArea.values()].map((s) => s.region))]
-      .filter((r) => !REGION_ORDER.includes(r))
-      .sort();
-    const regions = [...known, ...unknown];
+    // Regions are states now — alphabetical is the natural order.
+    const regions = [...new Set([...bySubArea.values()].map((s) => s.region))].sort();
     return regions.map((region) => ({
       region,
       subAreas: [...bySubArea.values()]
@@ -176,6 +169,19 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
       {allSubAreas.length > 1 && (
         <div className="region-pick-grid orbit-subarea-toggles">
           {regionMap.map((r) => {
+            if (r.subAreas.length <= 1) {
+              const value = r.subAreas[0] ?? r.region;
+              return (
+                <label key={r.region} className="region-pick-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedOrder.includes(value)}
+                    onChange={() => toggleSubArea(value)}
+                  />
+                  {r.region}
+                </label>
+              );
+            }
             const allSelected = r.subAreas.every((a) => selectedOrder.includes(a));
             return (
             <div key={r.region}>

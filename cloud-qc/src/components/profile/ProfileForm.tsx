@@ -8,6 +8,8 @@ import { THEMES, type ThemeKey } from "@/lib/profile-schema";
 import type { RegionMap } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
 import { AreaMultiSelect } from "@/components/profile/AreaMultiSelect";
+import { SubRegionSelect } from "@/components/SubRegionSelect";
+import { flattenRegionMap, parseArea, subValue } from "@/lib/sub-regions";
 
 const INITIAL: ProfileState = {};
 
@@ -51,7 +53,6 @@ export function ProfileForm({
   digestCadence,
   notificationChannel,
   smsConsent,
-  homeRegion,
   homeSubArea,
   digestSubAreas,
   regionMap,
@@ -82,23 +83,50 @@ export function ProfileForm({
   const [selectedTheme, setSelectedTheme] = useState<ThemeKey>(
     (theme as ThemeKey) || "default",
   );
-  const [homeRegionValue, setHomeRegionValue] = useState(homeRegion ?? "");
-  const [homeSubAreaValue, setHomeSubAreaValue] = useState(homeSubArea ?? "");
+  // One sub-region drives both the home location and the "Representing" list.
+  const [homeArea, setHomeArea] = useState(homeSubArea ?? "");
   const [subAreaPicks, setSubAreaPicks] = useState<Set<string>>(new Set(digestSubAreas));
   const [representingId, setRepresentingId] = useState(representingNeighbornetId ?? "");
 
-  const homeSubAreaOptions = regionMap.find((r) => r.region === homeRegionValue)?.subAreas ?? [];
+  const regionOfSubArea = useMemo(
+    () => new Map(flattenRegionMap(regionMap).map((r) => [r.subArea, r.region])),
+    [regionMap],
+  );
+  const homeRegionValue = homeArea ? (regionOfSubArea.get(homeArea) ?? "") : "";
+
+  // Once a sub-region is chosen, only its neighbornets are offered — plus the
+  // current pick, so an older out-of-region choice doesn't silently vanish.
+  const representingOptions = homeArea
+    ? neighbornetOptions.filter((n) => n.subArea === homeArea || n.id === representingId)
+    : neighbornetOptions;
+
+  function changeHomeArea(value: string) {
+    const parsed = parseArea(value);
+    const sub = parsed.kind === "sub" ? parsed.subArea : "";
+    setHomeArea(sub);
+    if (sub) {
+      const current = neighbornetOptions.find((n) => n.id === representingId);
+      if (current && current.subArea !== sub) setRepresentingId("");
+    }
+  }
+
+  // Works the other way too: picking a neighbornet moves the sub-region to it.
+  function changeRepresenting(id: string) {
+    setRepresentingId(id);
+    const nn = neighbornetOptions.find((n) => n.id === id);
+    if (nn?.subArea) setHomeArea(nn.subArea);
+  }
 
   const neighbornetGroups = useMemo(() => {
     const byGroup = new Map<string, NeighbornetOption[]>();
-    for (const n of neighbornetOptions) {
+    for (const n of representingOptions) {
       const key = n.subArea ? `${n.region} — ${n.subArea}` : n.region;
       const list = byGroup.get(key) ?? [];
       list.push(n);
       byGroup.set(key, list);
     }
     return [...byGroup.entries()];
-  }, [neighbornetOptions]);
+  }, [representingOptions]);
 
   function toggleSubArea(subArea: string) {
     setSubAreaPicks((prev) => {
@@ -167,86 +195,57 @@ export function ProfileForm({
       </div>
 
       <div className="field">
-        <label>
-          Home location <span className="optional-tag">optional</span>
+        <label htmlFor="home-area">
+          Home sub-region <span className="optional-tag">optional</span>
         </label>
-        <div className="form-grid">
-          <div>
-            <select
-              name="homeRegion"
-              value={homeRegionValue}
-              onChange={(e) => {
-                setHomeRegionValue(e.target.value);
-                setHomeSubAreaValue(""); // area list just changed under it
-              }}
-            >
-              <option value="">State…</option>
-              {regionMap.map((r) => (
-                <option key={r.region} value={r.region}>
-                  {r.region}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            {homeSubAreaOptions.length > 1 ? (
-              <select
-                name="homeSubArea"
-                value={homeSubAreaValue}
-                onChange={(e) => setHomeSubAreaValue(e.target.value)}
-              >
-                <option value="">Area…</option>
-                {homeSubAreaOptions.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <>
-                <select disabled>
-                  <option>
-                    {homeRegionValue ? "No further breakdown" : "Area…"}
-                  </option>
-                </select>
-                <input
-                  type="hidden"
-                  name="homeSubArea"
-                  value={homeSubAreaOptions[0] ?? ""}
-                />
-              </>
-            )}
-          </div>
-        </div>
+        <SubRegionSelect
+          id="home-area"
+          regionMap={regionMap}
+          value={homeArea ? subValue(homeArea) : ""}
+          onChange={changeHomeArea}
+          emptyLabel="Choose your sub-region…"
+        />
+        <input type="hidden" name="homeSubArea" value={homeArea} />
+        <input type="hidden" name="homeRegion" value={homeRegionValue} />
         <div className="survey-time-note">
           Where you&rsquo;re from — this is the default for which
-          neighbornets your digest covers, below.
+          neighbornets your digest covers, below, and where the feedback form
+          and Neighbornets page start.
         </div>
       </div>
 
       <div className="field">
-        <label>
+        <label htmlFor="representing">
           Representing <span className="optional-tag">optional</span>
         </label>
         <select
+          id="representing"
           name="representingNeighbornetId"
           value={representingId}
-          onChange={(e) => setRepresentingId(e.target.value)}
+          onChange={(e) => changeRepresenting(e.target.value)}
         >
           <option value="">No neighbornet chosen</option>
-          {neighbornetGroups.map(([groupLabel, options]) => (
-            <optgroup key={groupLabel} label={groupLabel}>
-              {options.map((n) => (
+          {homeArea
+            ? representingOptions.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.name}
                 </option>
+              ))
+            : neighbornetGroups.map(([groupLabel, options]) => (
+                <optgroup key={groupLabel} label={groupLabel}>
+                  {options.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </optgroup>
-          ))}
         </select>
         <div className="survey-time-note">
-          The one neighbornet you represent — shown next to your name on the
-          Cloud Team leaderboard.
+          {homeArea
+            ? `Showing neighbornets in ${homeArea}. `
+            : "Pick a sub-region above to narrow this list — or pick a neighbornet and your sub-region fills in. "}
+          Shown next to your name on the Cloud Team leaderboard.
         </div>
       </div>
 

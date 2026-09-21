@@ -15,6 +15,7 @@ export default async function MapPage() {
   const data: MapNeighbornet[] = summaries.map((n) => ({
     id: n.id,
     name: n.name,
+    city: n.city,
     subArea: n.subArea ?? "",
     region: n.region,
     stateCode: n.stateCode,

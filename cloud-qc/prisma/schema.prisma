@@ -32,6 +32,14 @@ enum VisitStatus {
   URGENT
 }
 
+// What kind of feedback a Visit row is. BASH / SR_EVENT are inter-sub-region
+// gatherings — labeled so their feedback can be routed back to sub-regions.
+enum VisitEventType {
+  VISIT
+  BASH
+  SR_EVENT
+}
+
 enum ParticipantRole {
   SUBMITTER
   CO_VISITOR
@@ -218,6 +226,8 @@ model Visit {
   // multiple neighbornets — one Visit row per neighbornet, linked by this id.
   // Null for an ordinary single-neighbornet visit.
   jointEventId String?
+
+  eventType VisitEventType @default(VISIT)
 
   neighbornetId String
   neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)

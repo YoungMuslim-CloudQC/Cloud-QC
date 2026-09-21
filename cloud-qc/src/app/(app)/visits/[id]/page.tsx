@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
 import {
   getVisitWithHistory,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/queries";
 import { isoDate, statusMeta } from "@/lib/format";
 import { type VisitSnapshot } from "@/lib/visit-history";
+import { EVENT_TYPE_LABEL } from "@/lib/visit-schema";
 import { PageHead } from "@/components/PageHead";
 import { BackLink } from "@/components/BackLink";
 import { VisitActions } from "@/components/visits/VisitActions";
@@ -33,6 +35,18 @@ export default async function VisitDetailPage({
 
   const visit = await getVisitWithHistory(id);
   if (!visit) notFound();
+
+  const jointWith = visit.jointEventId
+    ? await db.visit.findMany({
+        where: {
+          jointEventId: visit.jointEventId,
+          id: { not: visit.id },
+          deletedAt: null,
+        },
+        select: { id: true, neighbornet: { select: { id: true, name: true } } },
+        orderBy: { neighbornet: { name: "asc" } },
+      })
+    : [];
 
   const back = await resolveVisitBackTarget(
     typeof from === "string" ? from : undefined,
@@ -98,6 +112,21 @@ export default async function VisitDetailPage({
             fontSize: 13,
           }}
         >
+          <div style={{ color: "var(--text-muted)" }}>Type</div>
+          <div>{EVENT_TYPE_LABEL[visit.eventType]}</div>
+          {jointWith.length > 0 && (
+            <>
+              <div style={{ color: "var(--text-muted)" }}>Joint event with</div>
+              <div>
+                {jointWith.map((j, i) => (
+                  <span key={j.id}>
+                    {i > 0 && ", "}
+                    <Link href={`/visits/${j.id}`}>{j.neighbornet.name}</Link>
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
           <div style={{ color: "var(--text-muted)" }}>Visit date</div>
           <div className="cell-mono">{isoDate(visit.visitDate)}</div>
           <div style={{ color: "var(--text-muted)" }}>Submitted by</div>

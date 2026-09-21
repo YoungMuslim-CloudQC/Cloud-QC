@@ -24,13 +24,21 @@ export async function updateProfile(
 ): Promise<ProfileState> {
   const me = await assertApproved();
 
+  // Members only pick a sub-region; the state it sits in is derived here so
+  // the two can never disagree.
+  const regionMap = await getRegionMap();
+  const regionBySubArea = new Map(
+    regionMap.flatMap((r) => r.subAreas.map((a) => [a, r.region] as const)),
+  );
+  const pickedSubArea = String(formData.get("homeSubArea") ?? "");
+
   const parsed = profileSchema.safeParse({
     phone: formData.get("phone"),
     theme: formData.get("theme"),
     digestCadence: formData.get("digestCadence"),
     notificationChannel: formData.get("notificationChannel"),
     smsConsent: formData.get("smsConsent"),
-    homeRegion: formData.get("homeRegion"),
+    homeRegion: regionBySubArea.get(pickedSubArea) ?? "",
     homeSubArea: formData.get("homeSubArea"),
     digestSubAreas: formData.getAll("digestSubAreas"),
     representingNeighbornetId: formData.get("representingNeighbornetId"),
@@ -43,7 +51,6 @@ export async function updateProfile(
   // homeRegion/homeSubArea and every digestSubAreas entry must be real,
   // current subAreas — the zod schema above only checked shape, not that
   // these actually exist (that needs a DB round-trip).
-  const regionMap = await getRegionMap();
   const allSubAreas = new Set(regionMap.flatMap((r) => r.subAreas));
   if (d.homeSubArea && !allSubAreas.has(d.homeSubArea)) {
     return { ok: false, error: "Pick a valid area from the list." };

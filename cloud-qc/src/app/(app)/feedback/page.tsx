@@ -2,9 +2,13 @@ import Link from "next/link";
 
 import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
-import { memberName } from "@/lib/queries";
+import { memberName, getRegionMap } from "@/lib/queries";
 import { isoDate, statusMeta } from "@/lib/format";
-import { EMPTY_VISIT_INPUT, type VisitInput } from "@/lib/visit-schema";
+import {
+  EMPTY_VISIT_INPUT,
+  EVENT_TYPE_LABEL,
+  type VisitInput,
+} from "@/lib/visit-schema";
 import { PageHead } from "@/components/PageHead";
 import { FeedbackForm } from "@/components/feedback/FeedbackForm";
 import { SubmissionRowActions } from "@/components/feedback/SubmissionRowActions";
@@ -18,12 +22,12 @@ export default async function FeedbackPage({
   const { edit } = await searchParams;
   const editId = typeof edit === "string" ? edit : null;
 
-  const [neighbornets, members, mySubmissions, editingVisit] =
+  const [neighbornets, members, mySubmissions, editingVisit, regionMap, me] =
     await Promise.all([
       db.neighbornet.findMany({
         where: { archivedAt: null },
         orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
-        select: { id: true, name: true, subArea: true },
+        select: { id: true, name: true, subArea: true, region: true },
       }),
       db.user.findMany({
         where: { status: "APPROVED", id: { not: user.id } },
@@ -41,6 +45,11 @@ export default async function FeedbackPage({
             include: { participants: true },
           })
         : Promise.resolve(null),
+      getRegionMap(),
+      db.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: { homeSubArea: true },
+      }),
     ]);
 
   const canEditVisit =
@@ -55,6 +64,7 @@ export default async function FeedbackPage({
       input: {
         ...EMPTY_VISIT_INPUT,
         neighbornetIds: [editingVisit.neighbornetId],
+        eventType: editingVisit.eventType,
         visitDate: isoDate(editingVisit.visitDate),
         groupSize: editingVisit.groupSize,
         avgAge: editingVisit.avgAge,
@@ -81,8 +91,13 @@ export default async function FeedbackPage({
         key={editing?.visitId ?? "new"}
         neighbornets={neighbornets.map((n) => ({
           id: n.id,
+          name: n.name,
+          subArea: n.subArea,
+          region: n.region,
           label: n.subArea ? `${n.name} — ${n.subArea}` : n.name,
         }))}
+        regionMap={regionMap}
+        homeSubArea={me.homeSubArea}
         members={members.map((m) => ({ id: m.id, label: memberName(m) }))}
         submitterName={memberName(user)}
         editing={editing}
@@ -110,6 +125,11 @@ export default async function FeedbackPage({
                 <div>
                   <div className="visit-nn">{v.neighbornet.name}</div>
                   <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                  {v.eventType !== "VISIT" && (
+                    <span className="badge badge-event" style={{ marginLeft: 6 }}>
+                      {EVENT_TYPE_LABEL[v.eventType]}
+                    </span>
+                  )}
                 </div>
                 <SubmissionRowActions visitId={v.id} />
               </div>
