@@ -44,6 +44,11 @@ enum VisitEventType {
   SR_EVENT
 }
 
+enum SiteFeedbackStatus {
+  NEW
+  RESOLVED
+}
+
 enum ParticipantRole {
   SUBMITTER
   CO_VISITOR
@@ -101,8 +106,8 @@ model User {
   // "Where I'm from" — matches Neighbornet.region/subArea's shape (not a FK;
   // a home base, not a specific neighbornet). Setting/changing this also
   // adds subArea to digestSubAreas as its default (see updateProfile).
-  homeRegion    String?
-  homeSubArea   String?
+  homeRegion     String?
+  homeSubArea    String?
   // Which Neighbornet.subArea values this user's digest covers. Empty means
   // "no region picked yet" — buildDigestContent shows a nudge to set one
   // rather than defaulting to everything.
@@ -114,18 +119,19 @@ model User {
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
-  coordinates         NeighbornetCoordinator[]
+  coordinates  NeighbornetCoordinator[]
+  siteFeedback SiteFeedback[]
 
-  accounts            Account[]
-  sessions            Session[]
-  submittedVisits     Visit[]              @relation("VisitSubmittedBy")
-  participations      VisitParticipant[]
-  comments            VisitComment[]
-  visitHistoryEntries VisitHistory[]
-  rotations           RotationAssignment[] @relation("RotationUser")
-  rotationsAssigned   RotationAssignment[] @relation("RotationAssignedBy")
-  neighbornetsCreated Neighbornet[]        @relation("NeighbornetCreatedBy")
-  neighbornetsArchived Neighbornet[]       @relation("NeighbornetArchivedBy")
+  accounts             Account[]
+  sessions             Session[]
+  submittedVisits      Visit[]              @relation("VisitSubmittedBy")
+  participations       VisitParticipant[]
+  comments             VisitComment[]
+  visitHistoryEntries  VisitHistory[]
+  rotations            RotationAssignment[] @relation("RotationUser")
+  rotationsAssigned    RotationAssignment[] @relation("RotationAssignedBy")
+  neighbornetsCreated  Neighbornet[]        @relation("NeighbornetCreatedBy")
+  neighbornetsArchived Neighbornet[]        @relation("NeighbornetArchivedBy")
 
   @@index([status])
   @@index([representingNeighbornetId])
@@ -200,9 +206,9 @@ model Neighbornet {
   archivedById String?
   archivedBy   User?   @relation("NeighbornetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
 
-  visits      Visit[]
-  rotations   RotationAssignment[]
-  representedBy User[] @relation("UserRepresents")
+  visits        Visit[]
+  rotations     RotationAssignment[]
+  representedBy User[]                   @relation("UserRepresents")
   coordinators  NeighbornetCoordinator[]
 
   @@index([stateCode])
@@ -224,6 +230,30 @@ model NeighbornetCoordinator {
 
   @@unique([userId, neighbornetId])
   @@index([neighbornetId])
+}
+
+// Feedback about the Cloud QC site itself, left from any page: the person
+// highlights part of the screen and says what's wrong / how to improve it.
+model SiteFeedback {
+  id         String             @id @default(cuid())
+  createdAt  DateTime           @default(now())
+  status     SiteFeedbackStatus @default(NEW)
+  resolvedAt DateTime?
+
+  path       String // pathname + query of the page it was left on
+  problem    String // what's wrong
+  suggestion String? // how it could improve
+  // Where on the page: { selector, text, rect:{x,y,w,h} (document px),
+  // viewport:{w,h}, scrollY, userAgent, theme }.
+  context    Json?
+  // JPEG data URL of the highlighted area. Best-effort — absent if the
+  // capture failed. Served by /admin/site-feedback/<id>/screenshot.
+  screenshot String? @db.Text
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -271,10 +301,10 @@ model Visit {
 // Append-only audit log — one row per create / edit / delete / restore of a
 // visit, with a full JSON snapshot of the visit's state at that moment.
 model VisitHistory {
-  id          String            @id @default(cuid())
+  id          String             @id @default(cuid())
   action      VisitHistoryAction
   snapshot    Json
-  performedAt DateTime          @default(now())
+  performedAt DateTime           @default(now())
 
   visitId String
   visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)

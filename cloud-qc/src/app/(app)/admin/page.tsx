@@ -20,24 +20,26 @@ export default async function AdminPage() {
       },
     },
   } as const;
-  const [pending, all, settings, neighbornets, regionMap] = await Promise.all([
-    db.user.findMany({
-      where: { status: "PENDING" },
-      orderBy: { createdAt: "asc" },
-      include: withNns,
-    }),
-    db.user.findMany({
-      orderBy: [{ status: "asc" }, { name: "asc" }],
-      include: withNns,
-    }),
-    getSettings(),
-    db.neighbornet.findMany({
-      where: { archivedAt: null },
-      orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, subArea: true, region: true },
-    }),
-    getRegionMap(),
-  ]);
+  const [pending, all, settings, neighbornets, regionMap, newSiteFeedback] =
+    await Promise.all([
+      db.user.findMany({
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "asc" },
+        include: withNns,
+      }),
+      db.user.findMany({
+        orderBy: [{ status: "asc" }, { name: "asc" }],
+        include: withNns,
+      }),
+      getSettings(),
+      db.neighbornet.findMany({
+        where: { archivedAt: null },
+        orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, subArea: true, region: true },
+      }),
+      getRegionMap(),
+      db.siteFeedback.count({ where: { status: "NEW" } }),
+    ]);
 
   return (
     <>
@@ -52,6 +54,17 @@ export default async function AdminPage() {
           manualOffset={settings.manualOffset}
           goal={settings.goal}
         />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Site feedback</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          Comments members leave on any page with the &ldquo;Improve this page&rdquo;
+          button, including the part of the screen they highlighted.
+        </p>
+        <Link className="btn btn-secondary btn-small" href="/admin/site-feedback">
+          Open site feedback{newSiteFeedback > 0 ? ` (${newSiteFeedback} new)` : ""}
+        </Link>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

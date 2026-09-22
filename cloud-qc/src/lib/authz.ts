@@ -1,6 +1,6 @@
 import "server-only";
 
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -42,9 +42,6 @@ export async function requireApprovedAny(): Promise<SessionUser> {
   const user = await getFreshUser();
   if (!user) redirect("/login");
   if (user.status !== "APPROVED") redirect("/pending");
-  // Coordinator accounts exist in the shared database, but this build has no
-  // coordinator screens — never let one fall through to member access.
-  if (user.role !== "MEMBER" && user.role !== "ADMIN") notFound();
   return user;
 }
 
@@ -78,9 +75,6 @@ export async function assertApprovedAny(): Promise<SessionUser> {
   const user = await getFreshUser();
   if (!user || user.status !== "APPROVED") {
     throw new Error("Unauthorized");
-  }
-  if (user.role !== "MEMBER" && user.role !== "ADMIN") {
-    throw new Error("Forbidden: unsupported account type");
   }
   return user;
 }
