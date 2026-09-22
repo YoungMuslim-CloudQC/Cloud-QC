@@ -181,23 +181,39 @@ export function FeedbackForm({
     setError(res.error);
   }
 
+  // For a Bash/SR event, the same sub-region select that filters the NN
+  // picker above IS the required "what sub-region was this for" answer —
+  // one control, not two.
+  function subRegionFromArea(): string {
+    const a = parseArea(area);
+    if (a.kind === "sub") return a.subArea;
+    if (a.kind === "state") return a.region;
+    return "";
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setNotice(null);
     setDuplicates([]);
-    if (form.neighbornetIds.length === 0) {
+    if (form.eventType === "VISIT" && form.neighbornetIds.length === 0) {
       setError("Pick at least one neighbornet.");
+      return;
+    }
+    const subRegion = subRegionFromArea();
+    if (form.eventType !== "VISIT" && !subRegion) {
+      setError("Pick which sub-region this was for.");
       return;
     }
     if (!form.notes.trim()) {
       setError("The feedback paragraph is required to submit.");
       return;
     }
+    const submission = { ...form, subRegion };
     startTransition(async () => {
       const res = editing
-        ? await updateFeedback(editing.visitId, form)
-        : await submitFeedback(form);
+        ? await updateFeedback(editing.visitId, submission)
+        : await submitFeedback(submission);
       handleResult(res, "Feedback submitted.");
     });
   }
@@ -253,44 +269,57 @@ export function FeedbackForm({
         </div>
       </div>
 
-      {duplicates.length > 0 && (
-        <div className="duplicate-banner">
-          <div className="dup-title">
-            {duplicates.length > 1
-              ? "Visits already exist for this date"
-              : "A visit already exists for this date"}
-          </div>
-          <div className="dup-desc">
-            {duplicates.map((d) => (
-              <div key={d.neighbornetId}>
-                {d.submittedByName} already logged a visit to{" "}
-                {d.neighbornetName} on {d.visitDate}.
+      {duplicates.length > 0 && (() => {
+        const anyClaimed = duplicates.some((d) => d.alreadyClaimed);
+        return (
+          <div className="duplicate-banner">
+            <div className="dup-title">
+              {anyClaimed
+                ? "You're already listed on a visit for this date"
+                : duplicates.length > 1
+                  ? "Visits already exist for this date"
+                  : "A visit already exists for this date"}
+            </div>
+            <div className="dup-desc">
+              {duplicates.map((d) => (
+                <div key={d.neighbornetId}>
+                  {d.alreadyClaimed
+                    ? `${d.submittedByName} already logged a visit to ${d.neighbornetName} on ${d.visitDate} and named you as a co-visitor.`
+                    : `${d.submittedByName} already logged a visit to ${d.neighbornetName} on ${d.visitDate}.`}
+                </div>
+              ))}
+              {anyClaimed
+                ? "Is that right? Any other neighbornet you picked still gets logged fresh either way."
+                : "Link yours to the existing one(s) instead of counting separate visits? Any other neighbornet you picked still gets logged fresh."}
+            </div>
+            <div className="dup-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                style={{ width: "auto" }}
+                disabled={pending}
+                onClick={() => resolveDuplicate("link")}
+              >
+                {anyClaimed ? "Yes, that's right" : "Link my visit"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                disabled={pending}
+                onClick={() => resolveDuplicate("separate")}
+              >
+                {anyClaimed ? "No, I wasn't there" : "Submit as separate visit"}
+              </button>
+            </div>
+            {anyClaimed && (
+              <div className="survey-time-note" style={{ marginTop: 8 }}>
+                Saying no flags it for an admin to review — {duplicates.find((d) => d.alreadyClaimed)?.submittedByName}{" "}
+                will be notified.
               </div>
-            ))}
-            Link yours to the existing one(s) instead of counting separate
-            visits? Any other neighbornet you picked still gets logged fresh.
+            )}
           </div>
-          <div className="dup-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-small"
-              style={{ width: "auto" }}
-              disabled={pending}
-              onClick={() => resolveDuplicate("link")}
-            >
-              Link my visit
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-small"
-              disabled={pending}
-              onClick={() => resolveDuplicate("separate")}
-            >
-              Submit as separate visit
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="card" style={{ maxWidth: 640 }}>
         {error && <div className="auth-msg error">{error}</div>}
@@ -335,11 +364,21 @@ export function FeedbackForm({
 
           <div className="field full">
             <label>
-              {editing ? "Neighbornet" : "Neighbornet(s)"}{" "}
-              {!editing && (
+              {form.eventType !== "VISIT"
+                ? "Sub-region"
+                : editing
+                  ? "Neighbornet"
+                  : "Neighbornet(s)"}{" "}
+              {form.eventType !== "VISIT" ? (
                 <span className="optional-tag">
-                  pick more than one if it was a joint event
+                  which sub-region this event was for
                 </span>
+              ) : (
+                !editing && (
+                  <span className="optional-tag">
+                    pick more than one if it was a joint event
+                  </span>
+                )
               )}
             </label>
             <div className="nn-picker-row">
@@ -347,7 +386,7 @@ export function FeedbackForm({
                 regionMap={regionMap}
                 value={area}
                 onChange={setArea}
-                emptyLabel="All sub-regions"
+                emptyLabel={form.eventType !== "VISIT" ? "Choose a sub-region…" : "All sub-regions"}
                 allowWholeState
               />
               <select
@@ -377,6 +416,12 @@ export function FeedbackForm({
                 Add all {pickable.length} in this sub-region
               </button>
             )}
+            {form.eventType !== "VISIT" && (
+              <div className="survey-time-note" style={{ marginTop: 6 }}>
+                Which neighbornet(s) were involved{" "}
+                <span className="optional-tag">optional — for reference only, doesn&rsquo;t affect their status</span>
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
@@ -401,7 +446,9 @@ export function FeedbackForm({
               ))}
               {form.neighbornetIds.length === 0 && (
                 <span className="survey-time-note">
-                  Pick a sub-region, then the neighbornet.
+                  {form.eventType !== "VISIT"
+                    ? "No neighbornets picked — fine to leave blank."
+                    : "Pick a sub-region, then the neighbornet."}
                 </span>
               )}
             </div>

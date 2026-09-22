@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import { isoDate, statusMeta } from "@/lib/format";
 import { memberName } from "@/lib/queries";
 import { sendDigestEmail } from "@/lib/resend";
-import { EVENT_TYPE_LABEL } from "@/lib/visit-schema";
 
 /**
  * Emailing coordinators when feedback lands is opt-in twice over: the
@@ -28,7 +27,9 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Best-effort: never throws, never blocks logging the visit. */
+/** Best-effort: never throws, never blocks logging the visit. Only VISIT-type
+ *  visits carry real (credit-bearing) NN links — a Bash/SR event never
+ *  notifies anyone, since it isn't credited to any specific NN either. */
 export async function notifyCoordinators(visitId: string): Promise<void> {
   if (!coordinatorEmailsEnabled()) return;
   try {
@@ -36,32 +37,45 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
       where: { id: visitId },
       include: {
         submittedBy: { select: { name: true, email: true } },
-        neighbornet: {
-          select: {
-            name: true,
-            coordinators: {
+        neighbornets: {
+          include: {
+            neighbornet: {
               select: {
-                user: { select: { email: true, name: true, role: true, status: true } },
+                name: true,
+                coordinators: {
+                  select: {
+                    user: { select: { email: true, name: true, role: true, status: true } },
+                  },
+                },
               },
             },
           },
         },
       },
     });
-    if (!visit || visit.deletedAt) return;
-
-    const recipients = visit.neighbornet.coordinators
-      .map((c) => c.user)
-      .filter((u) => u.role === "COORDINATOR" && u.status === "APPROVED");
-    if (recipients.length === 0) return;
+    if (!visit || visit.deletedAt || visit.eventType !== "VISIT") return;
 
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
     const meta = statusMeta(visit.status);
-    const kind =
-      visit.eventType === "VISIT" ? "visit" : EVENT_TYPE_LABEL[visit.eventType].toLowerCase();
-    const subject = `New QC feedback for ${visit.neighbornet.name}`;
 
-    for (const to of recipients) {
+    // One email per coordinator, covering every NN of theirs this visit
+    // touches — a joint event shouldn't double-email someone who
+    // coordinates two of the tagged neighbornets.
+    const nnNamesByEmail = new Map<string, { user: { name: string | null; email: string }; nnNames: string[] }>();
+    for (const link of visit.neighbornets) {
+      for (const c of link.neighbornet.coordinators) {
+        if (c.user.role !== "COORDINATOR" || c.user.status !== "APPROVED") continue;
+        const entry = nnNamesByEmail.get(c.user.email) ?? { user: c.user, nnNames: [] };
+        entry.nnNames.push(link.neighbornet.name);
+        nnNamesByEmail.set(c.user.email, entry);
+      }
+    }
+    if (nnNamesByEmail.size === 0) return;
+
+    const kind = "visit";
+    for (const { user: to, nnNames } of nnNamesByEmail.values()) {
+      const nnLabel = nnNames.join(", ");
+      const subject = `New QC feedback for ${nnLabel}`;
       const html = `
   <div style="background:#0d0821;padding:32px 16px;font-family:Inter,Arial,sans-serif;">
     <div style="max-width:560px;margin:0 auto;background:#170f32;border:1px solid #2c2258;border-radius:14px;padding:28px;">
@@ -69,7 +83,7 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
       <div style="color:#948CBB;font-size:12.5px;margin-bottom:20px;">Young Muslim · QC Ops</div>
       <div style="color:#ede9fe;font-size:14px;margin-bottom:12px;">
         Hi ${esc((to.name ?? "there").split(" ")[0])}, ${esc(memberName(visit.submittedBy))} logged a ${esc(kind)} for
-        <strong>${esc(visit.neighbornet.name)}</strong> on ${isoDate(visit.visitDate)}${visit.status ? ` — ${esc(meta.label)}` : ""}.
+        <strong>${esc(nnLabel)}</strong> on ${isoDate(visit.visitDate)}${visit.status ? ` — ${esc(meta.label)}` : ""}.
       </div>
       <div style="color:#ede9fe;font-size:13.5px;border-left:2px solid #2c2258;padding-left:12px;white-space:pre-wrap;">${esc(visit.notes)}</div>
       <a href="${appUrl}/coordinator"

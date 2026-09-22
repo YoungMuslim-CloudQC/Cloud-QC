@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildVisitSnapshot, type VisitForSnapshot } from "./visit-history";
 
 const base: VisitForSnapshot = {
-  neighbornetId: "nn1",
-  neighbornet: { name: "Teaneck" },
+  neighbornets: [{ neighbornet: { name: "Teaneck" } }],
   visitDate: new Date("2026-02-03T00:00:00.000Z"),
   groupSize: 24,
   avgAge: 15,
@@ -27,8 +26,7 @@ describe("buildVisitSnapshot", () => {
   it("captures scalar fields and the ISO visit date", () => {
     const s = buildVisitSnapshot(base);
     expect(s).toMatchObject({
-      neighbornetId: "nn1",
-      neighbornetName: "Teaneck",
+      neighbornetNames: ["Teaneck"],
       visitDate: "2026-02-03",
       groupSize: 24,
       avgAge: 15,

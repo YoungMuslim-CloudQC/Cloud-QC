@@ -20,7 +20,9 @@ enum Role {
   ADMIN
   // Runs a neighbornet rather than QC-ing them: signs in to a read-only inbox
   // of the feedback logged about the neighbornet(s) linked in
-  // NeighbornetCoordinator. Blocked from every member screen.
+  // NeighbornetCoordinator. Blocked from every QC-member screen and action
+  // (feedback, rotation, leaderboard, digests); still shares profile and
+  // site feedback with everyone else.
   COORDINATOR
 }
 
@@ -52,6 +54,11 @@ enum SiteFeedbackStatus {
 enum ParticipantRole {
   SUBMITTER
   CO_VISITOR
+}
+
+enum VisitDisputeStatus {
+  PENDING
+  RESOLVED
 }
 
 enum VisitHistoryAction {
@@ -119,8 +126,7 @@ model User {
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
-  coordinates  NeighbornetCoordinator[]
-  siteFeedback SiteFeedback[]
+  coordinates NeighbornetCoordinator[]
 
   accounts             Account[]
   sessions             Session[]
@@ -128,6 +134,9 @@ model User {
   participations       VisitParticipant[]
   comments             VisitComment[]
   visitHistoryEntries  VisitHistory[]
+  disputesAgainstMe    VisitDispute[]       @relation("DisputedUser")
+  disputesResolved     VisitDispute[]       @relation("DisputeResolvedBy")
+  siteFeedback         SiteFeedback[]
   rotations            RotationAssignment[] @relation("RotationUser")
   rotationsAssigned    RotationAssignment[] @relation("RotationAssignedBy")
   neighbornetsCreated  Neighbornet[]        @relation("NeighbornetCreatedBy")
@@ -206,7 +215,8 @@ model Neighbornet {
   archivedById String?
   archivedBy   User?   @relation("NeighbornetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
 
-  visits        Visit[]
+  visits        Visit[] // legacy single-NN pointer — see Visit.neighbornetId
+  visitLinks    VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
   rotations     RotationAssignment[]
   representedBy User[]                   @relation("UserRepresents")
   coordinators  NeighbornetCoordinator[]
@@ -265,6 +275,12 @@ model Visit {
   visitDate        DateTime     @db.Date
   groupSize        Int? // prototype "average group size"
   avgAge           Int?
+  // Cached aggregate, not raw input beyond the submitter's own first entry:
+  // worst status / averaged ratings across every participant who contributed
+  // their own assessment (see VisitParticipant.status/*Rating). Recomputed
+  // by recomputeVisitAggregates() whenever a participant confirms with their
+  // own ratings — every existing reader of these four fields keeps working
+  // unchanged, they just now reflect the roll-up instead of one person's input.
   foodRating       Int?         @db.SmallInt // 1–5
   leadershipRating Int?         @db.SmallInt
   halaqahRating    Int?         @db.SmallInt
@@ -275,27 +291,95 @@ model Visit {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  // Set (to a shared value) when one submission covers a joint event across
-  // multiple neighbornets — one Visit row per neighbornet, linked by this id.
-  // Null for an ordinary single-neighbornet visit.
+  // Legacy — superseded by jointEventId fan-out being replaced with one Visit
+  // row + multiple VisitNeighbornet links. Left populated on old rows only;
+  // no longer written.
   jointEventId String?
 
-  eventType VisitEventType @default(VISIT)
+  eventType               VisitEventType @default(VISIT)
+  // Set only for BASH / SR_EVENT: which sub-region the event was for (same
+  // string vocabulary as Neighbornet.region/subArea — not a FK).
+  subRegion               String?
+  // BASH / SR_EVENT only: neighbornets that were involved, for visibility on
+  // this visit alone — deliberately NOT a relation. Never read by any NN
+  // status/history/leaderboard query; see VisitNeighbornet for the link that
+  // actually counts.
+  mentionedNeighbornetIds String[]       @default([])
 
-  neighbornetId String
-  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+  // Legacy single-NN pointer — kept for old rows and as a convenience, but no
+  // longer the source of truth for which NN(s) a visit counts toward; see
+  // VisitNeighbornet. Null for BASH/SR_EVENT and for any visit created after
+  // this field stopped being written.
+  neighbornetId String?
+  neighbornet   Neighbornet? @relation(fields: [neighbornetId], references: [id], onDelete: SetNull)
+
+  // The real, credit-bearing link(s) — one row per NN this visit counts
+  // toward. A joint event across N neighbornets is one Visit with N of these,
+  // not N Visit rows: this is what makes "1 visit = at most 1 point" hold
+  // regardless of how many NNs it's tagged to.
+  neighbornets VisitNeighbornet[]
 
   submittedById String
   submittedBy   User   @relation("VisitSubmittedBy", fields: [submittedById], references: [id])
 
-  participants VisitParticipant[]
-  comments     VisitComment[]
-  history      VisitHistory[]
+  participants  VisitParticipant[]
+  comments      VisitComment[]
+  history       VisitHistory[]
+  disputes      VisitDispute[]     @relation("DisputedVisit")
+  ownedDisputes VisitDispute[]     @relation("DisputeOwnVisit")
 
   @@index([neighbornetId, visitDate])
   @@index([submittedById])
   @@index([deletedAt])
   @@index([jointEventId])
+}
+
+// The credit-bearing visit <-> neighbornet link. A plain single-NN visit has
+// exactly one row here; a joint event has one row per tagged NN. Every NN
+// status/history rollup reads through this table, never Visit.neighbornetId.
+model VisitNeighbornet {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  @@unique([visitId, neighbornetId])
+  @@index([neighbornetId])
+}
+
+// Flagged when a named participant denies having been at a visit (same NN(s)
+// + date matched, but they said "no" to "did you visit with X?"). Sits in an
+// admin review queue at /admin/visit-disputes until resolved.
+model VisitDispute {
+  id         String             @id @default(cuid())
+  status     VisitDisputeStatus @default(PENDING)
+  createdAt  DateTime           @default(now())
+  resolvedAt DateTime?
+  note       String?
+  notifiedAt DateTime? // when the original submitter was emailed about this
+
+  // The original visit — the one whose participant list is in question.
+  visitId String
+  visit   Visit  @relation("DisputedVisit", fields: [visitId], references: [id], onDelete: Cascade)
+
+  // The user who denied being a participant.
+  disputedUserId String
+  disputedUser   User   @relation("DisputedUser", fields: [disputedUserId], references: [id], onDelete: Cascade)
+
+  // Their own separate visit, logged instead — for the admin to compare
+  // side by side. Kept even if later deleted (SetNull, not cascaded).
+  ownVisitId String?
+  ownVisit   Visit?  @relation("DisputeOwnVisit", fields: [ownVisitId], references: [id], onDelete: SetNull)
+
+  resolvedById String?
+  resolvedBy   User?   @relation("DisputeResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([disputedUserId])
 }
 
 // Append-only audit log — one row per create / edit / delete / restore of a
@@ -321,8 +405,19 @@ model VisitHistory {
 model VisitParticipant {
   id          String          @id @default(cuid())
   role        ParticipantRole
-  contributed Boolean         @default(false) // prototype "linked": personally filled the form
+  // Personally filled in their own assessment — the submitter always has,
+  // true; a co-visitor only does if they confirmed with their own ratings
+  // rather than just being named. Gates whether the four fields below are
+  // set, and whether this row counts toward Visit's recomputed aggregate.
+  contributed Boolean         @default(false)
   createdAt   DateTime        @default(now())
+
+  // This participant's own rating of the visit — null unless contributed.
+  // Visit.status/*Rating are the roll-up across every contributing row.
+  status           VisitStatus?
+  foodRating       Int?         @db.SmallInt
+  leadershipRating Int?         @db.SmallInt
+  halaqahRating    Int?         @db.SmallInt
 
   visitId String
   visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)

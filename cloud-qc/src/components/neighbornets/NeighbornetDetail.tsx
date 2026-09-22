@@ -28,18 +28,24 @@ export async function NeighbornetDetail({
         orderBy: { startedOn: "asc" },
         include: { user: { select: { name: true, email: true } } },
       },
-      visits: {
-        where: { deletedAt: null },
-        orderBy: [{ visitDate: "asc" }, { createdAt: "asc" }],
+      // The credit-bearing link — a joint event across several NNs shows up
+      // here once for this NN, and Bash/SR events never appear at all.
+      visitLinks: {
+        where: { visit: { deletedAt: null } },
+        orderBy: { visit: { visitDate: "asc" } },
         include: {
-          submittedBy: { select: { name: true, email: true } },
-          participants: {
-            where: { role: "CO_VISITOR" },
-            include: { user: { select: { name: true, email: true } } },
-          },
-          comments: {
-            orderBy: { createdAt: "asc" },
-            include: { author: { select: { name: true, email: true } } },
+          visit: {
+            include: {
+              submittedBy: { select: { name: true, email: true } },
+              participants: {
+                where: { role: "CO_VISITOR" },
+                include: { user: { select: { name: true, email: true } } },
+              },
+              comments: {
+                orderBy: { createdAt: "asc" },
+                include: { author: { select: { name: true, email: true } } },
+              },
+            },
           },
         },
       },
@@ -48,15 +54,16 @@ export async function NeighbornetDetail({
 
   if (!nn) notFound();
 
+  const visits = nn.visitLinks.map((l) => l.visit);
   const archived = nn.archivedAt != null;
   const partnerLabel = nn.rotations.length
     ? nn.rotations.map((r) => memberName(r.user)).join(", ")
     : "Unassigned";
 
-  const displayStatus = hysteresisStatus(nn.visits);
+  const displayStatus = hysteresisStatus(visits);
   const displayMeta = statusMeta(displayStatus);
 
-  const chartPoints = nn.visits
+  const chartPoints = visits
     .filter((v) => v.groupSize != null)
     .map((v) => ({ date: isoDate(v.visitDate), value: v.groupSize as number }));
 
@@ -139,7 +146,7 @@ export async function NeighbornetDetail({
         </div>
       )}
 
-      {nn.visits.length === 0 ? (
+      {visits.length === 0 ? (
         <div className="empty-state">
           <strong>No visits logged for this neighbornet</strong>
           Submit a QC feedback entry to start tracking it.
@@ -160,7 +167,7 @@ export async function NeighbornetDetail({
                 </tr>
               </thead>
               <tbody>
-                {[...nn.visits].reverse().map((v) => {
+                {[...visits].reverse().map((v) => {
                   const meta = statusMeta(v.status);
                   return (
                     <tr key={v.id}>

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
 import {
   getVisitWithHistory,
@@ -36,17 +35,10 @@ export default async function VisitDetailPage({
   const visit = await getVisitWithHistory(id);
   if (!visit) notFound();
 
-  const jointWith = visit.jointEventId
-    ? await db.visit.findMany({
-        where: {
-          jointEventId: visit.jointEventId,
-          id: { not: visit.id },
-          deletedAt: null,
-        },
-        select: { id: true, neighbornet: { select: { id: true, name: true } } },
-        orderBy: { neighbornet: { name: "asc" } },
-      })
-    : [];
+  const nns = visit.neighbornets.map((l) => l.neighbornet);
+  const titleLabel = nns.length
+    ? nns.map((n) => n.name).join(", ")
+    : (visit.subRegion ?? "Sub-region event");
 
   const back = await resolveVisitBackTarget(
     typeof from === "string" ? from : undefined,
@@ -75,9 +67,16 @@ export default async function VisitDetailPage({
         title="Visit"
         desc={
           <>
-            <Link href={`/neighbornets/${visit.neighbornet.id}`}>
-              {visit.neighbornet.name}
-            </Link>{" "}
+            {nns.length ? (
+              nns.map((n, i) => (
+                <span key={n.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/neighbornets/${n.id}`}>{n.name}</Link>
+                </span>
+              ))
+            ) : (
+              <span>{titleLabel}</span>
+            )}{" "}
             · {isoDate(visit.visitDate)}
           </>
         }
@@ -96,8 +95,9 @@ export default async function VisitDetailPage({
       <div className="card" style={{ maxWidth: 640, marginBottom: 20 }}>
         <div className="section-label">
           <span>
-            {visit.neighbornet.name}
-            {visit.neighbornet.subArea ? ` — ${visit.neighbornet.subArea}` : ""}
+            {nns.length > 1
+              ? `${nns.map((n) => n.name).join(", ")} (joint event)`
+              : titleLabel}
           </span>
           {visit.status && (
             <span className={`badge ${meta.cls}`}>{meta.label}</span>
@@ -114,17 +114,10 @@ export default async function VisitDetailPage({
         >
           <div style={{ color: "var(--text-muted)" }}>Type</div>
           <div>{EVENT_TYPE_LABEL[visit.eventType]}</div>
-          {jointWith.length > 0 && (
+          {visit.subRegion && (
             <>
-              <div style={{ color: "var(--text-muted)" }}>Joint event with</div>
-              <div>
-                {jointWith.map((j, i) => (
-                  <span key={j.id}>
-                    {i > 0 && ", "}
-                    <Link href={`/visits/${j.id}`}>{j.neighbornet.name}</Link>
-                  </span>
-                ))}
-              </div>
+              <div style={{ color: "var(--text-muted)" }}>Sub-region</div>
+              <div>{visit.subRegion}</div>
             </>
           )}
           <div style={{ color: "var(--text-muted)" }}>Visit date</div>
@@ -137,15 +130,55 @@ export default async function VisitDetailPage({
           <div>{visit.groupSize ?? "—"}</div>
           <div style={{ color: "var(--text-muted)" }}>Average age</div>
           <div>{visit.avgAge ?? "—"}</div>
-          <div style={{ color: "var(--text-muted)" }}>Food</div>
+          <div style={{ color: "var(--text-muted)" }}>Food (avg)</div>
           <div>{rating(visit.foodRating)}</div>
-          <div style={{ color: "var(--text-muted)" }}>Leadership</div>
+          <div style={{ color: "var(--text-muted)" }}>Leadership (avg)</div>
           <div>{rating(visit.leadershipRating)}</div>
-          <div style={{ color: "var(--text-muted)" }}>Halaqah</div>
+          <div style={{ color: "var(--text-muted)" }}>Halaqah (avg)</div>
           <div>{rating(visit.halaqahRating)}</div>
           <div style={{ color: "var(--text-muted)" }}>Feedback sent</div>
           <div>{visit.feedbackSent ? "Yes" : "No"}</div>
         </div>
+
+        {visit.participants.filter((p) => p.contributed).length > 1 && (
+          <details style={{ marginTop: 10 }}>
+            <summary
+              style={{ cursor: "pointer", fontSize: 11.5, color: "var(--secondary)" }}
+            >
+              Individual ratings ({visit.participants.filter((p) => p.contributed).length}{" "}
+              people)
+            </summary>
+            <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+              {visit.participants
+                .filter((p) => p.contributed)
+                .map((p) => {
+                  const pMeta = statusMeta(p.status);
+                  return (
+                    <div
+                      key={p.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr",
+                        gap: "2px 14px",
+                        fontSize: 12,
+                        padding: "6px 0",
+                        borderTop: "1px solid var(--border-soft)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{memberName(p.user)}</div>
+                      <div>
+                        {p.status && <span className={`badge ${pMeta.cls}`}>{pMeta.label}</span>}
+                      </div>
+                      <div style={{ color: "var(--text-muted)" }}>Food / Leadership / Halaqah</div>
+                      <div className="cell-mono">
+                        {rating(p.foodRating)} / {rating(p.leadershipRating)} / {rating(p.halaqahRating)}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </details>
+        )}
 
         <div
           style={{

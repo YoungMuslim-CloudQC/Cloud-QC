@@ -102,10 +102,14 @@ export async function buildDigestContent(
     select: {
       id: true,
       name: true,
-      visits: {
-        where: { deletedAt: null },
-        orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
-        select: { visitDate: true, status: true, notes: true },
+      // The credit-bearing link — a Bash/SR event never appears here, and a
+      // joint event across several NNs shows up once per NN, as intended.
+      visitLinks: {
+        where: { visit: { deletedAt: null } },
+        orderBy: { visit: { visitDate: "desc" } },
+        select: {
+          visit: { select: { visitDate: true, status: true, notes: true } },
+        },
       },
     },
   });
@@ -115,8 +119,9 @@ export async function buildDigestContent(
   const notVisitedNames: string[] = [];
 
   for (const n of neighbornets) {
-    const status = hysteresisStatus(n.visits);
-    const latest = n.visits[0] ?? null;
+    const visits = n.visitLinks.map((l) => l.visit);
+    const status = hysteresisStatus(visits);
+    const latest = visits[0] ?? null;
     if (status === "NEEDS_FOLLOWUP" || status === "URGENT") {
       attention.push({
         id: n.id,

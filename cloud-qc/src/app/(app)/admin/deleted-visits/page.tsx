@@ -45,7 +45,9 @@ export default async function DeletedVisitsPage() {
               <div className="section-label">
                 <span>
                   <Link href={`/visits/${v.id}?from=deleted`}>
-                    {v.neighbornet.name}
+                    {v.neighbornets.map((l) => l.neighbornet.name).join(", ") ||
+                      v.subRegion ||
+                      "Sub-region event"}
                   </Link>{" "}
                   <span
                     style={{

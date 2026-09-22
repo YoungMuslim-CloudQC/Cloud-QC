@@ -22,8 +22,11 @@ function rating(n: number | null) {
 
 function SnapshotFields({ s }: { s: VisitSnapshot }) {
   const meta = statusMeta(s.status);
+  const nnLabel = s.neighbornetNames?.length
+    ? s.neighbornetNames.join(", ")
+    : s.neighbornetName || (s.subRegion ? `${s.subRegion} (sub-region event)` : "—");
   const rows: [string, React.ReactNode][] = [
-    ["Neighbornet", s.neighbornetName],
+    ["Neighbornet", nnLabel],
     ["Visit date", <span className="cell-mono" key="d">{s.visitDate}</span>],
     ["Submitter", s.submittedByName],
     [

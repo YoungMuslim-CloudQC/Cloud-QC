@@ -53,12 +53,16 @@ export default async function CoordinatorInboxPage({
   const visits = await db.visit.findMany({
     where: {
       deletedAt: null,
-      neighbornetId: selected ? selected : { in: myNns.map((n) => n.id) },
+      // The credit-bearing link — a joint event touching this coordinator's
+      // NN still shows up here; a Bash/SR event never has one, so it can't.
+      neighbornets: {
+        some: { neighbornetId: selected ? selected : { in: myNns.map((n) => n.id) } },
+      },
     },
     orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
     take: INBOX_LIMIT,
     include: {
-      neighbornet: { select: { id: true, name: true } },
+      neighbornets: { include: { neighbornet: { select: { id: true, name: true } } } },
       submittedBy: { select: { name: true, email: true } },
       participants: {
         where: { role: "CO_VISITOR" },
@@ -123,7 +127,8 @@ export default async function CoordinatorInboxPage({
             <div className="card" key={v.id} style={{ maxWidth: 640, marginBottom: 14 }}>
               <div className="section-label">
                 <span>
-                  {v.neighbornet.name} &middot; {isoDate(v.visitDate)}
+                  {v.neighbornets.map((l) => l.neighbornet.name).join(", ")} &middot;{" "}
+                  {isoDate(v.visitDate)}
                 </span>
                 <span style={{ display: "flex", gap: 6 }}>
                   {v.eventType !== "VISIT" && (

@@ -23,7 +23,7 @@ export default async function TeamPage() {
         <div className="section-label">
           Leaderboard
           <span style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-muted)" }}>
-            Ranked by distinct neighbornets visited
+            Ranked by points — one per visit logged, joint events included once
           </span>
         </div>
         <Leaderboard members={members} />

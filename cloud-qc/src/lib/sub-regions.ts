@@ -53,3 +53,20 @@ export function areaWhere(value: string | null | undefined) {
   if (a.kind === "state") return { region: a.region };
   return {};
 }
+
+/** Same filter, but for Visit.subRegion — a plain string (set to either a
+ *  shared region name or one NN's own subArea, not a normalized value), so
+ *  this matches loosely: any string that could plausibly mean "here". */
+export function subRegionMatchValues(
+  value: string | null | undefined,
+  regionMap: RegionMap,
+): string[] | null {
+  const a = parseArea(value);
+  if (a.kind === "all") return null; // no filter
+  if (a.kind === "state") {
+    const r = regionMap.find((r) => r.region === a.region);
+    return [a.region, ...(r?.subAreas ?? [])];
+  }
+  const region = flattenRegionMap(regionMap).find((s) => s.subArea === a.subArea)?.region;
+  return region ? [a.subArea, region] : [a.subArea];
+}

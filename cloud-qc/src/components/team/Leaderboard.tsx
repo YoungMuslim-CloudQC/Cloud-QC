@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { rankByNeighbornetsVisited, type MemberStat } from "@/lib/queries";
+import { rankByPoints, type MemberStat } from "@/lib/queries";
 import { Avatar } from "@/components/Avatar";
 
 const RANK_CLASS: Record<number, string> = {
@@ -10,7 +10,7 @@ const RANK_CLASS: Record<number, string> = {
 };
 
 export function Leaderboard({ members }: { members: MemberStat[] }) {
-  const ranked = rankByNeighbornetsVisited(members).filter((m) => m.visitCount > 0);
+  const ranked = rankByPoints(members).filter((m) => m.visitCount > 0);
 
   if (ranked.length === 0) {
     return (
@@ -35,12 +35,14 @@ export function Leaderboard({ members }: { members: MemberStat[] }) {
                 {m.representingNeighbornet
                   ? `Representing ${m.representingNeighbornet.name}`
                   : "No neighbornet chosen"}
+                {" · "}
+                {m.distinctNeighbornets} NN{m.distinctNeighbornets === 1 ? "" : "s"} reached
               </div>
             </div>
             <div className="leaderboard-metric">
-              <div className="leaderboard-metric-value">{m.distinctNeighbornets}</div>
+              <div className="leaderboard-metric-value">{m.visitCount}</div>
               <div className="leaderboard-metric-label">
-                neighbornet{m.distinctNeighbornets === 1 ? "" : "s"}
+                point{m.visitCount === 1 ? "" : "s"}
               </div>
             </div>
           </Link>

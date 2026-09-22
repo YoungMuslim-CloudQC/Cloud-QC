@@ -20,7 +20,7 @@ export default async function AdminPage() {
       },
     },
   } as const;
-  const [pending, all, settings, neighbornets, regionMap, newSiteFeedback] =
+  const [pending, all, settings, neighbornets, regionMap, newSiteFeedback, pendingDisputes] =
     await Promise.all([
       db.user.findMany({
         where: { status: "PENDING" },
@@ -39,6 +39,7 @@ export default async function AdminPage() {
       }),
       getRegionMap(),
       db.siteFeedback.count({ where: { status: "NEW" } }),
+      db.visitDispute.count({ where: { status: "PENDING" } }),
     ]);
 
   return (
@@ -64,6 +65,17 @@ export default async function AdminPage() {
         </p>
         <Link className="btn btn-secondary btn-small" href="/admin/site-feedback">
           Open site feedback{newSiteFeedback > 0 ? ` (${newSiteFeedback} new)` : ""}
+        </Link>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Meets under review</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          Someone said they weren&rsquo;t at a visit another member logged them on.
+          Review both sides and correct the record.
+        </p>
+        <Link className="btn btn-secondary btn-small" href="/admin/visit-disputes">
+          Open meets under review{pendingDisputes > 0 ? ` (${pendingDisputes} pending)` : ""}
         </Link>
       </div>
 
