@@ -245,6 +245,49 @@ async function joinVisitAsCoVisitor(
   return visit.id;
 }
 
+/** Has this user already logged their own feedback for this NN on this
+ *  date — as submitter, or as a co-visitor who confirmed with their own
+ *  ratings? Deliberately excludes a merely-named (contributed=false) row:
+ *  that's an unconfirmed claim, not a second log, and still needs to go
+ *  through the match/confirm flow below rather than being blocked outright. */
+async function findSelfConflict(
+  tx: Tx,
+  userId: string,
+  neighbornetId: string,
+  visitDate: Date,
+  excludeVisitId?: string,
+) {
+  return tx.visit.findFirst({
+    where: {
+      deletedAt: null,
+      eventType: "VISIT",
+      visitDate,
+      ...(excludeVisitId ? { id: { not: excludeVisitId } } : {}),
+      neighbornets: { some: { neighbornetId } },
+      participants: { some: { userId, contributed: true } },
+    },
+    select: { id: true },
+  });
+}
+
+/** Same, across several neighbornets — returns the names of any that
+ *  conflict (usually none, or one). */
+async function findSelfConflicts(
+  tx: Tx,
+  userId: string,
+  nns: { id: string; name: string }[],
+  visitDate: Date,
+  excludeVisitId?: string,
+): Promise<string[]> {
+  const names: string[] = [];
+  for (const nn of nns) {
+    if (await findSelfConflict(tx, userId, nn.id, visitDate, excludeVisitId)) {
+      names.push(nn.name);
+    }
+  }
+  return names;
+}
+
 /** VISIT-type only: an existing visit for this NN on this date, submitted by
  *  someone else — with whether the current user is already named on it. */
 async function findMatch(tx: Tx, neighbornetId: string, visitDate: Date, userId: string) {
@@ -292,6 +335,15 @@ export async function submitFeedback(raw: VisitInput): Promise<SubmitResult> {
 
   if (input.eventType === "VISIT") {
     const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
+
+    const selfConflicts = await findSelfConflicts(db, user.id, nns, visitDate);
+    if (selfConflicts.length) {
+      return {
+        ok: false,
+        error: `You already logged ${selfConflicts.join(", ")} on ${input.visitDate} — edit that entry instead of creating a new one.`,
+      };
+    }
+
     const duplicates: DuplicateInfo[] = [];
     for (const nn of nns) {
       const existing = await findMatch(db, nn.id, visitDate, user.id);
@@ -329,9 +381,25 @@ export async function submitSeparateVisit(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  const input = parsed.data;
+
+  if (input.eventType === "VISIT" && input.neighbornetIds.length) {
+    const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
+    const nns = await db.neighbornet.findMany({
+      where: { id: { in: input.neighbornetIds } },
+      select: { id: true, name: true },
+    });
+    const selfConflicts = await findSelfConflicts(db, user.id, nns, visitDate);
+    if (selfConflicts.length) {
+      return {
+        ok: false,
+        error: `You already logged ${selfConflicts.join(", ")} on ${input.visitDate} — edit that entry instead of creating a new one.`,
+      };
+    }
+  }
 
   const visit = await db.$transaction(async (tx) => {
-    const v = await createVisit(tx, user.id, parsed.data, null);
+    const v = await createVisit(tx, user.id, input, null);
     for (const d of duplicates) {
       if (d.alreadyClaimed) {
         await tx.visitDispute.create({
@@ -394,6 +462,21 @@ export async function resolveJointDuplicates(
   const unmatched = input.neighbornetIds.filter((id) => !dupByNn.has(id));
   const jointEventId = unmatched.length > 1 ? crypto.randomUUID() : null;
 
+  if (unmatched.length) {
+    const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
+    const unmatchedNns = await db.neighbornet.findMany({
+      where: { id: { in: unmatched } },
+      select: { id: true, name: true },
+    });
+    const selfConflicts = await findSelfConflicts(db, user.id, unmatchedNns, visitDate);
+    if (selfConflicts.length) {
+      return {
+        ok: false,
+        error: `You already logged ${selfConflicts.join(", ")} on ${input.visitDate} — edit that entry instead of creating a new one.`,
+      };
+    }
+  }
+
   const visitId = await db.$transaction(async (tx) => {
     const created: string[] = [];
     for (const [, existingVisitId] of dupByNn) {
@@ -438,6 +521,29 @@ export async function updateFeedback(
   const { visit } = loaded;
   if (visit.deletedAt) {
     return { ok: false, error: "Restore this visit before editing it." };
+  }
+
+  if (input.eventType === "VISIT") {
+    const visitDate = new Date(`${input.visitDate}T00:00:00.000Z`);
+    const nn = await db.neighbornet.findUnique({
+      where: { id: input.neighbornetIds[0] },
+      select: { id: true, name: true },
+    });
+    if (nn) {
+      const conflict = await findSelfConflict(
+        db,
+        visit.submittedById,
+        nn.id,
+        visitDate,
+        visitId,
+      );
+      if (conflict) {
+        return {
+          ok: false,
+          error: `${visit.submittedById === user.id ? "You" : "This member"} already logged ${nn.name} on ${input.visitDate} in another entry.`,
+        };
+      }
+    }
   }
 
   const desired = new Set(
