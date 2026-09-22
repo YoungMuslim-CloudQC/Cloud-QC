@@ -33,7 +33,7 @@ export default async function DashboardPage() {
         orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
         take: 6,
         include: {
-          neighbornet: { select: { name: true } },
+          neighbornets: { include: { neighbornet: { select: { name: true } } } },
           submittedBy: { select: { name: true, email: true } },
           participants: {
             where: { role: "CO_VISITOR" },
@@ -160,7 +160,11 @@ export default async function DashboardPage() {
                 <div className="visit-row" key={v.id}>
                   <div className="visit-date">{isoDate(v.visitDate)}</div>
                   <div>
-                    <div className="visit-nn">{v.neighbornet.name}</div>
+                    <div className="visit-nn">
+                      {v.neighbornets.map((l) => l.neighbornet.name).join(", ") ||
+                        v.subRegion ||
+                        "Sub-region event"}
+                    </div>
                     <div className="visit-sub">by {by}</div>
                   </div>
                   <div className="visit-att">{v.groupSize ?? "—"}</div>

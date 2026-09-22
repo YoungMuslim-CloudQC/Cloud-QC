@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [pending, all, settings] = await Promise.all([
+  const [pending, all, settings, pendingDisputes] = await Promise.all([
     db.user.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -21,6 +21,7 @@ export default async function AdminPage() {
       orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
     getSettings(),
+    db.visitDispute.count({ where: { status: "PENDING" } }),
   ]);
 
   return (
@@ -36,6 +37,17 @@ export default async function AdminPage() {
           manualOffset={settings.manualOffset}
           goal={settings.goal}
         />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Meets under review</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          Someone said they weren&rsquo;t at a visit another member logged them on.
+          Review both sides and correct the record.
+        </p>
+        <Link className="btn btn-secondary btn-small" href="/admin/visit-disputes">
+          Open meets under review{pendingDisputes > 0 ? ` (${pendingDisputes} pending)` : ""}
+        </Link>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

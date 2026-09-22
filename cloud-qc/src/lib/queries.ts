@@ -48,7 +48,9 @@ export async function getVisitTotal() {
 }
 
 const VISIT_DETAIL_INCLUDE = {
-  neighbornet: { select: { id: true, name: true, subArea: true } },
+  neighbornets: {
+    include: { neighbornet: { select: { id: true, name: true, subArea: true } } },
+  },
   submittedBy: { select: { id: true, name: true, email: true } },
   participants: {
     include: { user: { select: { id: true, name: true, email: true } } },
@@ -135,8 +137,7 @@ export async function getPersonalDashboard(
             visitDate: true,
             status: true,
             feedbackSent: true,
-            neighbornetId: true,
-            neighbornet: { select: { name: true } },
+            neighbornets: { select: { neighbornetId: true, neighbornet: { select: { name: true } } } },
           },
         },
       },
@@ -147,7 +148,12 @@ export async function getPersonalDashboard(
     }),
   ]);
 
-  const distinct = new Set(participations.map((p) => p.visit.neighbornetId));
+  // One participant row per Visit record (unique(visitId,userId)), so
+  // participations.length is already "points" — a joint event across N NNs
+  // is still exactly one row here. Distinct NNs is a separate, secondary count.
+  const distinct = new Set(
+    participations.flatMap((p) => p.visit.neighbornets.map((l) => l.neighbornetId)),
+  );
 
   return {
     stats: {
@@ -157,7 +163,8 @@ export async function getPersonalDashboard(
     },
     recentVisits: participations.slice(0, 5).map((p) => ({
       id: p.visit.id,
-      neighbornetName: p.visit.neighbornet.name,
+      neighbornetName:
+        p.visit.neighbornets.map((l) => l.neighbornet.name).join(", ") || "Sub-region event",
       visitDate: p.visit.visitDate,
       status: p.visit.status,
     })),
@@ -199,7 +206,11 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
       select: {
         userId: true,
         visit: {
-          select: { neighbornetId: true, visitDate: true, feedbackSent: true },
+          select: {
+            visitDate: true,
+            feedbackSent: true,
+            neighbornets: { select: { neighbornetId: true } },
+          },
         },
       },
     }),
@@ -214,7 +225,7 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
 
   return members.map((m) => {
     const rows = byUser.get(m.id) ?? [];
-    const nnSet = new Set(rows.map((r) => r.visit.neighbornetId));
+    const nnSet = new Set(rows.flatMap((r) => r.visit.neighbornets.map((l) => l.neighbornetId)));
     const last = rows.reduce<Date | null>(
       (acc, r) =>
         !acc || r.visit.visitDate > acc ? r.visit.visitDate : acc,
@@ -226,6 +237,8 @@ export async function getTeamMemberStats(): Promise<MemberStat[]> {
       email: m.email,
       image: m.image,
       role: m.role,
+      // One row per Visit record this member is on — a joint event across
+      // several NNs is still exactly one here. This is the "points" metric.
       visitCount: rows.length,
       distinctNeighbornets: nnSet.size,
       pending: rows.filter((r) => !r.visit.feedbackSent).length,
@@ -247,14 +260,17 @@ export async function getNeighbornetOptions(): Promise<
   });
 }
 
-/** Members ranked by distinct neighbornets visited (ties broken by total
- *  visit count, then name) — the Cloud Team leaderboard. */
-export function rankByNeighbornetsVisited(members: MemberStat[]): MemberStat[] {
+/** Members ranked by points — one point per distinct Visit record they're a
+ *  participant on, regardless of how many neighbornets it's tagged to (a
+ *  joint event across several NNs, or an SR event/Bash with none, is still
+ *  worth exactly one point). Ties broken by distinct neighbornets reached,
+ *  then name — the Cloud Team leaderboard. */
+export function rankByPoints(members: MemberStat[]): MemberStat[] {
   return [...members].sort((a, b) => {
+    if (b.visitCount !== a.visitCount) return b.visitCount - a.visitCount;
     if (b.distinctNeighbornets !== a.distinctNeighbornets) {
       return b.distinctNeighbornets - a.distinctNeighbornets;
     }
-    if (b.visitCount !== a.visitCount) return b.visitCount - a.visitCount;
     return a.name.localeCompare(b.name);
   });
 }
@@ -309,10 +325,14 @@ export async function getNeighbornetSummaries(
     where: { archivedAt: archived ? { not: null } : null },
     orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
     include: {
-      visits: {
-        where: { deletedAt: null },
-        orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
-        select: { id: true, visitDate: true, status: true },
+      // The credit-bearing link — SR/Bash events never appear here, and a
+      // joint event across several NNs shows up once per NN, as intended.
+      visitLinks: {
+        where: { visit: { deletedAt: null } },
+        orderBy: { visit: { visitDate: "desc" } },
+        select: {
+          visit: { select: { id: true, visitDate: true, status: true } },
+        },
       },
       rotations: {
         where: { endedOn: null },
@@ -321,23 +341,25 @@ export async function getNeighbornetSummaries(
           user: { select: { id: true, name: true, email: true } },
         },
       },
-      _count: { select: { visits: { where: { deletedAt: null } } } },
     },
   });
 
-  return neighbornets.map((n) => ({
-    ...n,
-    latitude: n.latitude ? Number(n.latitude) : null,
-    longitude: n.longitude ? Number(n.longitude) : null,
-    latestVisit: n.visits[0] ?? null,
-    // Hysteresis roll-up over the whole visit history — this is the status
-    // shown on the dashboard, map pins, and cards.
-    displayStatus: hysteresisStatus(n.visits),
-    partners: n.rotations.map((r) => ({
-      id: r.user.id,
-      name: memberName(r.user),
-      since: r.startedOn,
-    })),
-    visitCount: n._count.visits,
-  }));
+  return neighbornets.map((n) => {
+    const visits = n.visitLinks.map((l) => l.visit);
+    return {
+      ...n,
+      latitude: n.latitude ? Number(n.latitude) : null,
+      longitude: n.longitude ? Number(n.longitude) : null,
+      latestVisit: visits[0] ?? null,
+      // Hysteresis roll-up over the whole visit history — this is the status
+      // shown on the dashboard, map pins, and cards.
+      displayStatus: hysteresisStatus(visits),
+      partners: n.rotations.map((r) => ({
+        id: r.user.id,
+        name: memberName(r.user),
+        since: r.startedOn,
+      })),
+      visitCount: visits.length,
+    };
+  });
 }

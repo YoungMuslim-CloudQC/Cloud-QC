@@ -4,8 +4,11 @@ import { isoDate } from "@/lib/format";
  *  VisitHistory row. Names are denormalized so the timeline renders even if a
  *  user or neighbornet is later renamed. */
 export type VisitSnapshot = {
-  neighbornetId: string;
-  neighbornetName: string;
+  neighbornetNames: string[]; // empty for an SR/Bash event
+  subRegion?: string | null; // SR/Bash events only
+  /** @deprecated singular — present only on snapshots taken before a visit
+   *  could span multiple neighbornets. Read neighbornetNames instead. */
+  neighbornetName?: string;
   visitDate: string; // YYYY-MM-DD
   eventType?: string; // absent on snapshots taken before event types existed
   groupSize: number | null;
@@ -25,8 +28,8 @@ type Named = { name?: string | null; email?: string | null };
 const nameOf = (u: Named) => u.name || u.email || "Member";
 
 export type VisitForSnapshot = {
-  neighbornetId: string;
-  neighbornet: { name: string };
+  neighbornets: { neighbornet: { name: string } }[];
+  subRegion?: string | null;
   eventType?: string;
   visitDate: Date | string;
   groupSize: number | null;
@@ -48,8 +51,8 @@ export type VisitForSnapshot = {
 
 export function buildVisitSnapshot(visit: VisitForSnapshot): VisitSnapshot {
   return {
-    neighbornetId: visit.neighbornetId,
-    neighbornetName: visit.neighbornet.name,
+    neighbornetNames: visit.neighbornets.map((l) => l.neighbornet.name),
+    subRegion: visit.subRegion,
     visitDate: isoDate(visit.visitDate),
     eventType: visit.eventType,
     groupSize: visit.groupSize,
@@ -69,7 +72,7 @@ export function buildVisitSnapshot(visit: VisitForSnapshot): VisitSnapshot {
 }
 
 export const VISIT_SNAPSHOT_INCLUDE = {
-  neighbornet: { select: { name: true } },
+  neighbornets: { include: { neighbornet: { select: { name: true } } } },
   submittedBy: { select: { name: true, email: true } },
   participants: { include: { user: { select: { name: true, email: true } } } },
 } as const;

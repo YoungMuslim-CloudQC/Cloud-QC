@@ -32,15 +32,18 @@ export async function MemberDetail({
     where: { userId: id, visit: { deletedAt: null } },
     include: {
       visit: {
-        include: { neighbornet: { select: { name: true } } },
+        include: {
+          neighbornets: { include: { neighbornet: { select: { name: true } } } },
+        },
       },
     },
     orderBy: { visit: { visitDate: "desc" } },
   });
 
   const name = memberName(member);
-  const distinctNn = new Set(participations.map((p) => p.visit.neighbornetId))
-    .size;
+  const distinctNn = new Set(
+    participations.flatMap((p) => p.visit.neighbornets.map((l) => l.neighbornetId)),
+  ).size;
   const last = participations[0]?.visit.visitDate ?? null;
 
   return (
@@ -107,7 +110,9 @@ export async function MemberDetail({
                   <tr key={p.id}>
                     <td data-label="Neighbornet">
                       <Link href={`/visits/${p.visit.id}?from=member:${id}`}>
-                        {p.visit.neighbornet.name}
+                        {p.visit.neighbornets.map((l) => l.neighbornet.name).join(", ") ||
+                          p.visit.subRegion ||
+                          "Sub-region event"}
                       </Link>
                     </td>
                     <td className="cell-mono" data-label="Visit date">

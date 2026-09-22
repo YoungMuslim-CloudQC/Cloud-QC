@@ -37,12 +37,12 @@ export default async function FeedbackPage({
       db.visit.findMany({
         where: { submittedById: user.id, deletedAt: null },
         orderBy: { visitDate: "desc" },
-        include: { neighbornet: { select: { name: true } } },
+        include: { neighbornets: { include: { neighbornet: { select: { name: true } } } } },
       }),
       editId
         ? db.visit.findUnique({
             where: { id: editId },
-            include: { participants: true },
+            include: { participants: true, neighbornets: true },
           })
         : Promise.resolve(null),
       getRegionMap(),
@@ -63,8 +63,9 @@ export default async function FeedbackPage({
       visitId: editingVisit.id,
       input: {
         ...EMPTY_VISIT_INPUT,
-        neighbornetIds: [editingVisit.neighbornetId],
+        neighbornetIds: editingVisit.neighbornets.map((l) => l.neighbornetId),
         eventType: editingVisit.eventType,
+        subRegion: editingVisit.subRegion ?? undefined,
         visitDate: isoDate(editingVisit.visitDate),
         groupSize: editingVisit.groupSize,
         avgAge: editingVisit.avgAge,
@@ -123,7 +124,11 @@ export default async function FeedbackPage({
                   <Link href={`/visits/${v.id}`}>{isoDate(v.visitDate)}</Link>
                 </div>
                 <div>
-                  <div className="visit-nn">{v.neighbornet.name}</div>
+                  <div className="visit-nn">
+                    {v.neighbornets.map((l) => l.neighbornet.name).join(", ") ||
+                      v.subRegion ||
+                      "Sub-region event"}
+                  </div>
                   <span className={`badge ${meta.cls}`}>{meta.label}</span>
                   {v.eventType !== "VISIT" && (
                     <span className="badge badge-event" style={{ marginLeft: 6 }}>
