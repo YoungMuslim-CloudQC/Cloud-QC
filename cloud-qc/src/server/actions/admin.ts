@@ -39,9 +39,9 @@ export async function rejectUser(formData: FormData) {
 export async function setUserRole(formData: FormData) {
   const me = await assertAdmin();
   const { userId } = idSchema.parse({ userId: formData.get("userId") });
-  const role = z.enum(["MEMBER", "ADMIN"]).parse(formData.get("role"));
+  const role = z.enum(["MEMBER", "ADMIN", "COORDINATOR"]).parse(formData.get("role"));
 
-  if (userId === me.id && role === "MEMBER") {
+  if (userId === me.id && role !== "ADMIN") {
     throw new Error("You can't remove your own admin access.");
   }
 
@@ -105,5 +105,42 @@ export async function adminUpdateMemberProfile(
   revalidatePath(`/team/${d.userId}`);
   revalidatePath("/team");
   revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Replace the set of neighbornets a coordinator runs (their inbox is
+ *  exactly this set). */
+export async function setCoordinatorNeighbornets(
+  userId: string,
+  neighbornetIds: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  await assertAdmin();
+  const ids = [...new Set(z.array(z.string().min(1)).max(50).parse(neighbornetIds))];
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!user || user.role !== "COORDINATOR") {
+    return { ok: false, error: "That account isn't a coordinator." };
+  }
+  const found = await db.neighbornet.count({
+    where: { id: { in: ids }, archivedAt: null },
+  });
+  if (found !== ids.length) {
+    return { ok: false, error: "One of those neighbornets isn't available." };
+  }
+
+  await db.$transaction([
+    db.neighbornetCoordinator.deleteMany({
+      where: { userId, neighbornetId: { notIn: ids } },
+    }),
+    db.neighbornetCoordinator.createMany({
+      data: ids.map((neighbornetId) => ({ userId, neighbornetId })),
+      skipDuplicates: true,
+    }),
+  ]);
+  revalidatePath("/admin");
+  revalidatePath("/coordinator");
   return { ok: true };
 }

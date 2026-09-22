@@ -2,25 +2,41 @@ import Link from "next/link";
 
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/authz";
-import { getSettings } from "@/lib/queries";
+import { getSettings, getRegionMap } from "@/lib/queries";
 import { PageHead } from "@/components/PageHead";
 import { approveUser, rejectUser, setUserRole } from "@/server/actions/admin";
 import { DashboardAdjustments } from "@/components/admin/DashboardAdjustments";
+import { CoordinatorAssign } from "@/components/admin/CoordinatorAssign";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const me = await requireAdmin();
 
-  const [pending, all, settings] = await Promise.all([
+  const withNns = {
+    coordinates: {
+      select: {
+        neighbornet: { select: { id: true, name: true, subArea: true } },
+      },
+    },
+  } as const;
+  const [pending, all, settings, neighbornets, regionMap] = await Promise.all([
     db.user.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
+      include: withNns,
     }),
     db.user.findMany({
       orderBy: [{ status: "asc" }, { name: "asc" }],
+      include: withNns,
     }),
     getSettings(),
+    db.neighbornet.findMany({
+      where: { archivedAt: null },
+      orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, subArea: true, region: true },
+    }),
+    getRegionMap(),
   ]);
 
   return (
@@ -77,7 +93,21 @@ export default async function AdminPage() {
                 </div>
               </div>
               <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                {u.passwordHash ? "Email / password" : "Google"}
+                {u.role === "COORDINATOR" ? (
+                  <>
+                    <span className="badge badge-event">coordinator</span>
+                    <div style={{ marginTop: 4 }}>
+                      Says they coordinate:{" "}
+                      {u.coordinates.length
+                        ? u.coordinates.map((c) => c.neighbornet.name).join(", ")
+                        : "—"}
+                    </div>
+                  </>
+                ) : u.passwordHash ? (
+                  "Email / password"
+                ) : (
+                  "Google"
+                )}
               </div>
               <div />
               <div style={{ display: "flex", gap: 6 }}>
@@ -102,9 +132,9 @@ export default async function AdminPage() {
       <div className="card">
         <div className="section-label">All accounts</div>
         {all.map((u) => {
-          const nextRole = u.role === "ADMIN" ? "MEMBER" : "ADMIN";
           return (
-            <div key={u.id} className="user-row">
+            <div key={u.id}>
+            <div className="user-row">
               <div>
                 <strong>{u.name || "—"}</strong>
                 <div style={{ color: "var(--text-muted)", fontSize: "11.5px" }}>
@@ -131,18 +161,31 @@ export default async function AdminPage() {
               </div>
               <div>
                 {u.status === "APPROVED" && u.id !== me.id && (
-                  <form action={setUserRole}>
+                  <form action={setUserRole} className="role-form">
                     <input type="hidden" name="userId" value={u.id} />
-                    <input type="hidden" name="role" value={nextRole} />
+                    <select name="role" defaultValue={u.role} aria-label="Role">
+                      <option value="MEMBER">QC member</option>
+                      <option value="COORDINATOR">Coordinator</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
                     <button
                       className="btn btn-secondary btn-small"
                       type="submit"
                     >
-                      Make {nextRole.toLowerCase()}
+                      Set role
                     </button>
                   </form>
                 )}
               </div>
+            </div>
+            {u.role === "COORDINATOR" && u.status === "APPROVED" && (
+              <CoordinatorAssign
+                userId={u.id}
+                initialIds={u.coordinates.map((c) => c.neighbornet.id)}
+                neighbornets={neighbornets}
+                regionMap={regionMap}
+              />
+            )}
             </div>
           );
         })}

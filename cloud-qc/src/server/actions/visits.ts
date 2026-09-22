@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { assertApproved } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { memberName } from "@/lib/queries";
+import { notifyCoordinators } from "@/lib/coordinator-email";
 import {
   buildVisitSnapshot,
   VISIT_SNAPSHOT_INCLUDE,
@@ -113,6 +114,7 @@ async function createVisit(
     },
   });
   await recordHistory(visit.id, "CREATED", userId);
+  await notifyCoordinators(visit.id); // no-op unless explicitly enabled in production
   return visit;
 }
 

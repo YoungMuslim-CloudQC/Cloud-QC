@@ -29,7 +29,7 @@ export default async function RotationPage() {
       },
     }),
     db.user.findMany({
-      where: { status: "APPROVED" },
+      where: { status: "APPROVED", role: { not: "COORDINATOR" } },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true },
     }),

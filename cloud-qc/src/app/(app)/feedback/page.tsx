@@ -30,7 +30,7 @@ export default async function FeedbackPage({
         select: { id: true, name: true, subArea: true, region: true },
       }),
       db.user.findMany({
-        where: { status: "APPROVED", id: { not: user.id } },
+        where: { status: "APPROVED", role: { not: "COORDINATOR" }, id: { not: user.id } },
         orderBy: { name: "asc" },
         select: { id: true, name: true, email: true },
       }),

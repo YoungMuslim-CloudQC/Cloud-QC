@@ -1,11 +1,24 @@
 import Link from "next/link";
 
+import { db } from "@/lib/db";
+import { getRegionMap } from "@/lib/queries";
 import { googleEnabled, googleHostedDomain } from "@/lib/auth.config";
 import { CloudMark } from "@/components/Brand";
 import { GoogleButton } from "@/components/GoogleButton";
 import { SignupForm } from "@/components/auth/SignupForm";
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  // Needed so someone signing up as a coordinator can say which neighbornet
+  // they run. Names only.
+  const [neighbornets, regionMap] = await Promise.all([
+    db.neighbornet.findMany({
+      where: { archivedAt: null },
+      orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, subArea: true, region: true },
+    }),
+    getRegionMap(),
+  ]);
+
   return (
     <div className="auth-card">
       <div className="auth-brand">
@@ -21,7 +34,7 @@ export default function SignupPage() {
         <span className="auth-tab active">Sign up</span>
       </div>
 
-      <SignupForm />
+      <SignupForm neighbornets={neighbornets} regionMap={regionMap} />
 
       {googleEnabled && (
         <>

@@ -58,6 +58,7 @@ export function ProfileForm({
   regionMap,
   representingNeighbornetId,
   neighbornetOptions,
+  isCoordinator = false,
 }: {
   name: string;
   image: string | null;
@@ -72,6 +73,8 @@ export function ProfileForm({
   regionMap: RegionMap;
   representingNeighbornetId: string | null;
   neighbornetOptions: NeighbornetOption[];
+  /** Coordinators only manage photo/phone/theme — no QC digest or leaderboard. */
+  isCoordinator?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(updateProfile, INITIAL);
   const { update: updateSession } = useSession();
@@ -194,6 +197,8 @@ export function ProfileForm({
         />
       </div>
 
+      {!isCoordinator && (
+      <>
       <div className="field">
         <label htmlFor="home-area">
           Home sub-region <span className="optional-tag">optional</span>
@@ -373,6 +378,9 @@ export function ProfileForm({
           </div>
         </div>
       </div>
+
+      </>
+      )}
 
       <div className="field">
         <label>Appearance</label>

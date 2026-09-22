@@ -183,7 +183,7 @@ export type MemberStat = {
 export async function getTeamMemberStats(): Promise<MemberStat[]> {
   const [members, participants] = await Promise.all([
     db.user.findMany({
-      where: { status: "APPROVED" },
+      where: { status: "APPROVED", role: { not: "COORDINATOR" } },
       orderBy: { name: "asc" },
       select: {
         id: true,

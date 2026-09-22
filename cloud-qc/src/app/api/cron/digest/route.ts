@@ -30,7 +30,11 @@ export async function GET(req: Request) {
   const now = new Date();
 
   const candidates = await db.user.findMany({
-    where: { status: "APPROVED", digestCadence: { not: "OFF" } },
+    where: {
+      status: "APPROVED",
+      role: { not: "COORDINATOR" },
+      digestCadence: { not: "OFF" },
+    },
     select: {
       id: true,
       name: true,

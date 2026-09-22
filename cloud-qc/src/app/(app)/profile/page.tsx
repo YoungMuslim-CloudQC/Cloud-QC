@@ -1,11 +1,11 @@
 import { db } from "@/lib/db";
-import { requireApproved } from "@/lib/authz";
+import { requireApprovedAny } from "@/lib/authz";
 import { getRegionMap, getNeighbornetOptions } from "@/lib/queries";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { SendTestDigestButton } from "@/components/profile/SendTestDigestButton";
 
 export default async function ProfilePage() {
-  const me = await requireApproved();
+  const me = await requireApprovedAny();
   const [user, regionMap, neighbornetOptions] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id: me.id },
@@ -51,6 +51,7 @@ export default async function ProfilePage() {
           digestSubAreas={user.digestSubAreas}
           regionMap={regionMap}
           representingNeighbornetId={user.representingNeighbornetId}
+          isCoordinator={me.role === "COORDINATOR"}
           neighbornetOptions={neighbornetOptions}
         />
         {me.role === "ADMIN" && <SendTestDigestButton />}
