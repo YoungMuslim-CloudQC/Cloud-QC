@@ -45,13 +45,16 @@ export default async function NeighbornetPage({
         desc="All local groups, their visit history, and attendance trend."
       />
 
-      {isAdmin && (
-        <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {isAdmin && (
           <Link className="btn btn-secondary btn-small" href="/neighbornets/new">
             + Add a neighbornet
           </Link>
-        </div>
-      )}
+        )}
+        <a className="btn btn-secondary btn-small" href={`/api/export/visits?nn=${id}`}>
+          Export this neighbornet&rsquo;s feedback (CSV)
+        </a>
+      </div>
 
       <div className="two-col">
         <div className="card">
