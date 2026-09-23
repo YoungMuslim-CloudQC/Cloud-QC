@@ -44,13 +44,19 @@ export default async function NeighbornetsPage({
         desc="Pick a sub-region to see its feedback, then open a single neighbornet."
       />
 
-      {isAdmin && (
-        <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {isAdmin && (
           <Link className="btn btn-secondary btn-small" href="/neighbornets/new">
             + Add a neighbornet
           </Link>
-        </div>
-      )}
+        )}
+        <a
+          className="btn btn-secondary btn-small"
+          href={`/api/export/visits${area ? `?area=${encodeURIComponent(area)}` : ""}`}
+        >
+          Export {area ? `${areaLabel(area)} ` : "all "}feedback (CSV)
+        </a>
+      </div>
 
       <div className="two-col">
         <div className="card">
