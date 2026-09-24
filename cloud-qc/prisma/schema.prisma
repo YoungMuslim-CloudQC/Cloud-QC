@@ -46,6 +46,13 @@ enum VisitEventType {
   SR_EVENT
 }
 
+// ACTIVE = a full, established neighbornet. EXPANSION = an SR still in
+// training — same table, same queries; see Neighbornet.stage.
+enum NeighbornetStage {
+  ACTIVE
+  EXPANSION
+}
+
 enum SiteFeedbackStatus {
   NEW
   RESOLVED
@@ -208,6 +215,22 @@ model Neighbornet {
   archivedAt   DateTime? // set together with archivedById; both cleared on unarchive
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  // A full NN and an early-stage "expansion" (an SR still in training, not
+  // yet QC'd) share this same table and every query that lists NNs — the
+  // stage is purely a label + filter (see /neighbornets), not an access
+  // gate. An expansion can still be visited, logged, coordinated, etc.
+  // exactly like an ACTIVE one; nothing reads this field to hide a row.
+  stage NeighbornetStage @default(ACTIVE)
+
+  // Set only while tracking an expansion's social media rollout; meaningless
+  // for an ACTIVE NN but left on the same row rather than a second table so
+  // a promoted expansion keeps its id/history with nothing to migrate.
+  mediaLead           String?
+  phone               String?
+  driveUploads        Boolean?
+  postingConsistently Boolean?
+  expansionComments   String?
 
   createdById String?
   createdBy   User?   @relation("NeighbornetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)

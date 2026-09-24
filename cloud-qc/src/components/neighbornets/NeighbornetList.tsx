@@ -6,15 +6,22 @@ import { areaWhere, parseArea } from "@/lib/sub-regions";
 export async function NeighbornetList({
   activeId,
   area = "",
+  stage = "",
 }: {
   activeId?: string;
   /** Sub-region filter value (see lib/sub-regions). "" = every neighbornet. */
   area?: string;
+  /** "" = both stages, "ACTIVE", or "EXPANSION". */
+  stage?: "" | "ACTIVE" | "EXPANSION";
 }) {
   const neighbornets = await db.neighbornet.findMany({
-    where: { archivedAt: null, ...areaWhere(area) },
+    where: {
+      archivedAt: null,
+      ...areaWhere(area),
+      ...(stage ? { stage } : {}),
+    },
     orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, subArea: true },
+    select: { id: true, name: true, subArea: true, stage: true },
   });
 
   if (neighbornets.length === 0) {
@@ -37,7 +44,14 @@ export async function NeighbornetList({
           href={`/neighbornets/${n.id}${query}`}
           className={`nn-select-item${n.id === activeId ? " active" : ""}`}
         >
-          <div className="nsi-name">{n.name}</div>
+          <div className="nsi-name">
+            {n.name}
+            {n.stage === "EXPANSION" && (
+              <span className="badge badge-event" style={{ marginLeft: 6 }}>
+                Expansion
+              </span>
+            )}
+          </div>
           {!singleSub && <div className="nsi-city">{n.subArea}</div>}
         </Link>
       ))}

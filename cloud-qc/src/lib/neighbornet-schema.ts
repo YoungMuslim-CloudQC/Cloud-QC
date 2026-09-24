@@ -33,6 +33,20 @@ export const neighbornetSchema = z.object({
     z.string().trim().email("Not a valid email").optional(),
   ),
   instagram: z.preprocess(emptyToUndef, z.string().trim().max(80).optional()),
+
+  // Stage + expansion-tracking fields — see Neighbornet.stage in schema.prisma.
+  stage: z.enum(["ACTIVE", "EXPANSION"]).default("ACTIVE"),
+  mediaLead: z.preprocess(emptyToUndef, z.string().trim().max(120).optional()),
+  phone: z.preprocess(emptyToUndef, z.string().trim().max(40).optional()),
+  driveUploads: z.preprocess(
+    (v) => (v === "on" || v === "true" ? true : v === "" || v == null ? undefined : v),
+    z.boolean().optional(),
+  ),
+  postingConsistently: z.preprocess(
+    (v) => (v === "on" || v === "true" ? true : v === "" || v == null ? undefined : v),
+    z.boolean().optional(),
+  ),
+  expansionComments: z.preprocess(emptyToUndef, z.string().trim().max(2000).optional()),
 });
 
 export type NeighbornetInput = z.infer<typeof neighbornetSchema>;
