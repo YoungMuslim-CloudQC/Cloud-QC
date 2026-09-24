@@ -12,12 +12,14 @@ import { NeighbornetList } from "@/components/neighbornets/NeighbornetList";
 
 export const dynamic = "force-dynamic";
 
+const STAGE_LABEL = { "": "All", ACTIVE: "Active", EXPANSION: "Expansions" } as const;
+
 export default async function NeighbornetsPage({
   searchParams,
 }: PageProps<"/neighbornets">) {
   const user = await requireApproved();
   const isAdmin = user.role === "ADMIN";
-  const { area: areaParam, type: typeParam } = await searchParams;
+  const { area: areaParam, type: typeParam, stage: stageParam } = await searchParams;
 
   const [regionMap, me] = await Promise.all([
     getRegionMap(),
@@ -36,6 +38,7 @@ export default async function NeighbornetsPage({
         ? subValue(me.homeSubArea)
         : "";
   const type = EVENT_TYPES.find((t) => t === typeParam) as EventTypeValue | undefined;
+  const stage = (["ACTIVE", "EXPANSION"] as const).find((s) => s === stageParam) ?? "";
 
   return (
     <>
@@ -64,7 +67,23 @@ export default async function NeighbornetsPage({
           <div className="section-label" style={{ marginTop: 14 }}>
             {areaLabel(area)}
           </div>
-          <NeighbornetList area={area} />
+          <div className="status-options" style={{ marginBottom: 12 }}>
+            {(Object.keys(STAGE_LABEL) as (keyof typeof STAGE_LABEL)[]).map((s) => {
+              const params = new URLSearchParams({ area });
+              if (s) params.set("stage", s);
+              return (
+                <Link
+                  key={s || "all"}
+                  href={`/neighbornets?${params.toString()}`}
+                  className={`status-opt${stage === s ? " sel-ok" : ""}`}
+                  style={{ textDecoration: "none" }}
+                >
+                  {STAGE_LABEL[s]}
+                </Link>
+              );
+            })}
+          </div>
+          <NeighbornetList area={area} stage={stage} />
         </div>
         <div className="card">
           <AreaFeed area={area} type={type ?? ""} />

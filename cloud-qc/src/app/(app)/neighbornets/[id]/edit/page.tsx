@@ -43,6 +43,12 @@ export default async function EditNeighbornetPage({
             longitude: nn.longitude != null ? Number(nn.longitude) : null,
             contactEmail: nn.contactEmail,
             instagram: nn.instagram,
+            stage: nn.stage,
+            mediaLead: nn.mediaLead,
+            phone: nn.phone,
+            driveUploads: nn.driveUploads,
+            postingConsistently: nn.postingConsistently,
+            expansionComments: nn.expansionComments,
           }}
         />
       </div>

@@ -77,6 +77,11 @@ export async function NeighbornetDetail({
           {nn.subArea ? ` — ${nn.subArea}` : ""}
         </span>
         <span style={{ display: "flex", gap: 6 }}>
+          {nn.stage === "EXPANSION" && (
+            <span className="badge badge-event" title="Still in training — not yet an established NN">
+              Expansion
+            </span>
+          )}
           {archived && (
             <span className="badge badge-neutral" title="This neighbornet is archived">
               Archived
@@ -143,6 +148,35 @@ export async function NeighbornetDetail({
           }}
         >
           {contactBits.join(" · ")}
+        </div>
+      )}
+
+      {nn.stage === "EXPANSION" && (
+        <div className="shared-banner" style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto 1fr",
+              gap: "4px 14px",
+              fontSize: 13,
+            }}
+          >
+            <div style={{ color: "var(--text-muted)" }}>Media lead</div>
+            <div>{nn.mediaLead ?? "—"}</div>
+            <div style={{ color: "var(--text-muted)" }}>Number</div>
+            <div>{nn.phone ?? "—"}</div>
+            <div style={{ color: "var(--text-muted)" }}>Drive uploads</div>
+            <div>{nn.driveUploads ? "Yes" : nn.driveUploads === false ? "No" : "—"}</div>
+            <div style={{ color: "var(--text-muted)" }}>Posting consistently</div>
+            <div>
+              {nn.postingConsistently ? "Yes" : nn.postingConsistently === false ? "No" : "—"}
+            </div>
+          </div>
+          {nn.expansionComments && (
+            <div style={{ marginTop: 10, fontSize: 13, whiteSpace: "pre-wrap" }}>
+              {nn.expansionComments}
+            </div>
+          )}
         </div>
       )}
 

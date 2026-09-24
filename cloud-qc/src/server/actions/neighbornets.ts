@@ -52,6 +52,12 @@ export async function addNeighbornet(
       longitude: d.longitude ?? null,
       contactEmail: d.contactEmail ?? null,
       instagram: d.instagram ?? null,
+      stage: d.stage,
+      mediaLead: d.mediaLead ?? null,
+      phone: d.phone ?? null,
+      driveUploads: d.driveUploads ?? null,
+      postingConsistently: d.postingConsistently ?? null,
+      expansionComments: d.expansionComments ?? null,
       createdById: admin.id,
     },
   });
@@ -95,6 +101,12 @@ export async function updateNeighbornet(
       longitude: d.longitude ?? null,
       contactEmail: d.contactEmail ?? null,
       instagram: d.instagram ?? null,
+      stage: d.stage,
+      mediaLead: d.mediaLead ?? null,
+      phone: d.phone ?? null,
+      driveUploads: d.driveUploads ?? null,
+      postingConsistently: d.postingConsistently ?? null,
+      expansionComments: d.expansionComments ?? null,
     },
   });
 

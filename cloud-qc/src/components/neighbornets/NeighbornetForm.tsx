@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   addNeighbornet,
@@ -22,6 +22,12 @@ type Values = {
   longitude: number | null;
   contactEmail: string | null;
   instagram: string | null;
+  stage: "ACTIVE" | "EXPANSION";
+  mediaLead: string | null;
+  phone: string | null;
+  driveUploads: boolean | null;
+  postingConsistently: boolean | null;
+  expansionComments: string | null;
 };
 
 function Field({
@@ -72,10 +78,33 @@ export function NeighbornetForm({
       : addNeighbornet;
   const [state, formAction, pending] = useActionState(action, INITIAL);
   const fe = state.fieldErrors ?? {};
+  const [stage, setStage] = useState<"ACTIVE" | "EXPANSION">(initial?.stage ?? "ACTIVE");
 
   return (
     <form action={formAction}>
       {state.error && <div className="auth-msg error">{state.error}</div>}
+
+      <div className="field">
+        <label htmlFor="nn-stage">Stage</label>
+        <div className="status-options">
+          <button
+            type="button"
+            className={`status-opt${stage === "ACTIVE" ? " sel-ok" : ""}`}
+            onClick={() => setStage("ACTIVE")}
+          >
+            Active neighbornet
+          </button>
+          <button
+            type="button"
+            className={`status-opt${stage === "EXPANSION" ? " sel-ok" : ""}`}
+            onClick={() => setStage("EXPANSION")}
+          >
+            Expansion / SR in training
+          </button>
+        </div>
+        <input type="hidden" id="nn-stage" name="stage" value={stage} />
+      </div>
+
       <div className="form-grid">
         <Field
           name="name"
@@ -126,6 +155,65 @@ export function NeighbornetForm({
           error={fe.instagram}
         />
       </div>
+
+      {stage === "EXPANSION" && (
+        <div className="form-grid" style={{ marginTop: 4 }}>
+          <div className="section-label" style={{ gridColumn: "1 / -1" }}>
+            <span>Expansion tracking</span>
+          </div>
+          <Field
+            name="mediaLead"
+            label="Media lead"
+            optional="optional"
+            placeholder="Who's running their socials"
+            defaultValue={initial?.mediaLead ?? ""}
+            error={fe.mediaLead}
+          />
+          <Field
+            name="phone"
+            label="Number"
+            optional="optional"
+            defaultValue={initial?.phone ?? ""}
+            error={fe.phone}
+          />
+          <label
+            className="field"
+            style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+          >
+            <input
+              type="checkbox"
+              name="driveUploads"
+              defaultChecked={initial?.driveUploads ?? false}
+            />
+            Uploading to the drive
+          </label>
+          <label
+            className="field"
+            style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+          >
+            <input
+              type="checkbox"
+              name="postingConsistently"
+              defaultChecked={initial?.postingConsistently ?? false}
+            />
+            Posting consistently
+          </label>
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <label htmlFor="nn-expansionComments">
+              Comments <span className="optional-tag">optional</span>
+            </label>
+            <textarea
+              id="nn-expansionComments"
+              name="expansionComments"
+              rows={3}
+              defaultValue={initial?.expansionComments ?? ""}
+            />
+            {fe.expansionComments && (
+              <span className="field-error">{fe.expansionComments}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <LocationPicker
         existingStates={existingStates}
