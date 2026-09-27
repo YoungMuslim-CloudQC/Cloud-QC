@@ -19,10 +19,11 @@ import {
   updateFeedback,
 } from "@/server/actions/visits";
 import type { RegionMap } from "@/lib/queries";
+import { buildCoSuggestions, type CoVisitorOption } from "@/lib/co-visitors";
 import { SubRegionSelect } from "@/components/SubRegionSelect";
 import { AREA_ALL, matchesArea, parseArea, subValue } from "@/lib/sub-regions";
 
-type Option = { id: string; label: string };
+type Option = CoVisitorOption;
 type NnOption = {
   id: string;
   name: string;
@@ -61,6 +62,7 @@ export function FeedbackForm({
   regionMap,
   homeSubArea,
   members,
+  recentCoVisitorIds = [],
   submitterName,
   editing,
 }: {
@@ -68,7 +70,11 @@ export function FeedbackForm({
   regionMap: RegionMap;
   /** The submitter's profile home — the sub-region the picker starts on. */
   homeSubArea: string | null;
+  /** Approved members, already sorted by name. */
   members: Option[];
+  /** Who this user last logged a visit with, most recent first — the top of
+   *  the co-visitor shortlist. */
+  recentCoVisitorIds?: string[];
   submitterName: string;
   editing?: { visitId: string; input: VisitInput } | null;
 }) {
@@ -83,6 +89,7 @@ export function FeedbackForm({
 
   const [form, setForm] = useState<Draft>(initial);
   const [coQuery, setCoQuery] = useState("");
+  const [coOpen, setCoOpen] = useState(false);
   const [area, setArea] = useState<string>(() => {
     if (editing) {
       const nn = neighbornets.find((n) => n.id === editing.input.neighbornetIds[0]);
@@ -134,18 +141,22 @@ export function FeedbackForm({
     setCoQuery("");
   }
 
-  // Co-visitor search: everyone not already added whose name matches what's
-  // typed. Capped so a short query can't drop a wall of names on a phone.
-  const coMatches = useMemo(() => {
-    const q = coQuery.trim().toLowerCase();
-    if (!q) return [];
-    return members
-      .filter(
-        (m) =>
-          !form.coVisitorIds.includes(m.id) && m.label.toLowerCase().includes(q),
-      )
-      .slice(0, 8);
-  }, [coQuery, members, form.coVisitorIds]);
+  const recentSet = useMemo(
+    () => new Set(recentCoVisitorIds),
+    [recentCoVisitorIds],
+  );
+
+  const coMatches = useMemo(
+    () =>
+      buildCoSuggestions({
+        members,
+        recentIds: recentCoVisitorIds,
+        homeSubArea,
+        taken: form.coVisitorIds,
+        query: coQuery,
+      }),
+    [coQuery, members, form.coVisitorIds, recentCoVisitorIds, homeSubArea],
+  );
 
   // In the picker: matches the chosen sub-region, and (when logging several
   // at once) isn't already picked.
@@ -550,22 +561,26 @@ export function FeedbackForm({
                 optional — counts as their visit too
               </span>
             </label>
-            {/* Type to search rather than a dropdown of every member: the
-                roster only grows, and scrolling a few hundred names on a
-                phone to find one person doesn't scale. */}
+            {/* A shortlist you can scroll, or type to narrow — rather than a
+                dropdown of the whole roster, which only gets worse as Cloud
+                grows. */}
             <div className="typeahead">
               <input
                 type="text"
                 value={coQuery}
                 onChange={(e) => setCoQuery(e.target.value)}
-                placeholder="Start typing a name…"
+                onFocus={() => setCoOpen(true)}
+                onBlur={() => setCoOpen(false)}
+                placeholder="Search or pick a name…"
                 autoComplete="off"
               />
-              {coQuery.trim() !== "" && (
+              {coOpen && (
                 <div className="typeahead-results">
                   {coMatches.length === 0 ? (
                     <div className="typeahead-empty">
-                      No one matches &ldquo;{coQuery.trim()}&rdquo;
+                      {coQuery.trim()
+                        ? `No one matches “${coQuery.trim()}”`
+                        : "Everyone's already added."}
                     </div>
                   ) : (
                     coMatches.map((m) => (
@@ -573,9 +588,15 @@ export function FeedbackForm({
                         type="button"
                         key={m.id}
                         className="typeahead-item"
+                        // Pick on mousedown so the click lands before the
+                        // input's blur can close the list out from under it.
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => addCoVisitor(m.id)}
                       >
-                        {m.label}
+                        <span>{m.label}</span>
+                        {recentSet.has(m.id) && (
+                          <span className="optional-tag">visited with you</span>
+                        )}
                       </button>
                     ))
                   )}
