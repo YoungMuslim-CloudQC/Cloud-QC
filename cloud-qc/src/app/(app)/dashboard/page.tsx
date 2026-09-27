@@ -44,6 +44,14 @@ export default async function DashboardPage() {
       getPersonalDashboard(user.id),
     ]);
 
+  // The orbit and the neighbornet grid both open on the viewer's own
+  // sub-region rather than all ~30 — see their components for why.
+  const me = await db.user.findUnique({
+    where: { id: user.id },
+    select: { homeSubArea: true },
+  });
+  const homeSubArea = me?.homeSubArea ?? null;
+
   const pairedSet = new Set(personal.pairedNeighbornetIds);
   const myPaired = summaries
     .filter((s) => pairedSet.has(s.id))
@@ -131,6 +139,7 @@ export default async function DashboardPage() {
         <div className="section-label">Network</div>
         <div className="orbit-wrap">
           <Orbit
+            homeSubArea={homeSubArea}
             nodes={summaries.map((n) => ({
               id: n.id,
               name: n.name,
@@ -178,7 +187,7 @@ export default async function DashboardPage() {
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <NeighbornetBoard neighbornets={mapData} />
+        <NeighbornetBoard neighbornets={mapData} homeSubArea={homeSubArea} />
       </div>
     </>
   );

@@ -861,6 +861,54 @@ label {
   text-transform: none;
   font-size: 11px;
 }
+/* The counterpart to .optional-tag, for the few answers that really are
+   required (event type, date, the feedback paragraph). */
+.required-tag {
+  font-weight: 500;
+  color: var(--accent);
+  text-transform: none;
+  font-size: 11px;
+}
+
+/* Type-to-search picker — used for co-visitors, where a plain <select> of
+   every member stopped scaling. */
+.typeahead {
+  position: relative;
+}
+.typeahead-results {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.typeahead-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.typeahead-item:last-child {
+  border-bottom: none;
+}
+.typeahead-item:hover,
+.typeahead-item:focus-visible {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
+}
+.typeahead-empty {
+  padding: 9px 11px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -1676,6 +1724,25 @@ tr:last-child td {
    same shape, so no need to redefine it. */
 .orbit-subarea-toggles {
   margin-bottom: 16px;
+}
+/* Row above the orbit: what's currently shown + the toggle that opens the
+   sub-region checkboxes (closed by default — there are ~30 of them). */
+/* Row under the dashboard's neighbornet grid: the ways out of the short
+   list (more in this area / show all / browse). */
+.nn-board-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.orbit-picker-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 .orbit-region-heading-row {
   display: flex;
