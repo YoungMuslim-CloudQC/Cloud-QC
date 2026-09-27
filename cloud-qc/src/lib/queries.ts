@@ -122,6 +122,36 @@ export type PersonalDashboard = {
   pairedNeighbornetIds: string[];
 };
 
+/** The people this user most recently logged a visit alongside, most recent
+ *  first, de-duplicated. Seeds the top of the co-visitor picker: whoever you
+ *  went out with last time is overwhelmingly who you went out with again. */
+export async function getRecentCoVisitorIds(
+  userId: string,
+  limit = 3,
+): Promise<string[]> {
+  const rows = await db.visitParticipant.findMany({
+    where: {
+      userId: { not: userId },
+      visit: { deletedAt: null, participants: { some: { userId } } },
+    },
+    orderBy: [
+      { visit: { visitDate: "desc" } },
+      { visit: { createdAt: "desc" } },
+    ],
+    // Enough rows to find `limit` distinct people even when the last few
+    // outings were all with the same group.
+    take: 60,
+    select: { userId: true },
+  });
+
+  const out: string[] = [];
+  for (const r of rows) {
+    if (!out.includes(r.userId)) out.push(r.userId);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 /** The signed-in user's own numbers for the dashboard "Yours" section. */
 export async function getPersonalDashboard(
   userId: string,

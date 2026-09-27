@@ -93,7 +93,16 @@ function buildCell(subArea: string, region: string, cellNodes: OrbitNode[]): Cel
   return { subArea, region, radius, hubR, size, nodes };
 }
 
-export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
+export function Orbit({
+  nodes,
+  homeSubArea,
+}: {
+  nodes: OrbitNode[];
+  /** The viewer's own sub-region — the one cell the orbit opens on. Showing
+   *  every sub-area at once ran to ten phone-screens of graphic once the
+   *  directory went national, and buried the viewer's own neighbornets in it. */
+  homeSubArea?: string | null;
+}) {
   const regionMap = useMemo(() => {
     const bySubArea = new Map<string, { region: string; subArea: string }>();
     for (const n of nodes) {
@@ -114,7 +123,13 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
   const allSubAreas = useMemo(() => regionMap.flatMap((r) => r.subAreas), [regionMap]);
   // Order here is selection order, not region order: newly picked areas go to
   // the end, so cells lay out in the sequence the user actually clicked them.
-  const [selectedOrder, setSelectedOrder] = useState<string[]>(() => allSubAreas);
+  // Starts on the viewer's own sub-region only — everything else is one tap
+  // away in the picker below.
+  const [selectedOrder, setSelectedOrder] = useState<string[]>(() => {
+    if (homeSubArea && allSubAreas.includes(homeSubArea)) return [homeSubArea];
+    return allSubAreas.slice(0, 1);
+  });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   function toggleSubArea(subArea: string) {
     setSelectedOrder((prev) =>
@@ -167,6 +182,21 @@ export function Orbit({ nodes }: { nodes: OrbitNode[] }) {
   return (
     <div>
       {allSubAreas.length > 1 && (
+        <div className="orbit-picker-bar">
+          <span className="survey-time-note">
+            Showing {selectedOrder.length} of {allSubAreas.length} sub-regions
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={() => setPickerOpen((o) => !o)}
+          >
+            {pickerOpen ? "Done" : "Choose areas"}
+          </button>
+        </div>
+      )}
+
+      {allSubAreas.length > 1 && pickerOpen && (
         <div className="region-pick-grid orbit-subarea-toggles">
           {regionMap.map((r) => {
             if (r.subAreas.length <= 1) {

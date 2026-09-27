@@ -9,6 +9,7 @@ import {
   EVENT_TYPE_LABEL,
   VISIT_STATUSES,
   type DuplicateInfo,
+  type EventTypeValue,
   type VisitInput,
   type VisitStatusValue,
 } from "@/lib/visit-schema";
@@ -18,10 +19,11 @@ import {
   updateFeedback,
 } from "@/server/actions/visits";
 import type { RegionMap } from "@/lib/queries";
+import { buildCoSuggestions, type CoVisitorOption } from "@/lib/co-visitors";
 import { SubRegionSelect } from "@/components/SubRegionSelect";
 import { AREA_ALL, matchesArea, parseArea, subValue } from "@/lib/sub-regions";
 
-type Option = { id: string; label: string };
+type Option = CoVisitorOption;
 type NnOption = {
   id: string;
   name: string;
@@ -48,15 +50,19 @@ const RATING_FIELDS = [
   ["halaqahRating", "How was the halaqah?"],
 ] as const;
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
+/** The form's working copy. Event type starts unpicked and the date starts
+ *  blank, so both are a deliberate answer rather than a default someone
+ *  scrolls past — a pre-filled "today" was quietly wrong every time a visit
+ *  got logged a few days late. Narrowed back to a real VisitInput on submit,
+ *  once both have been answered. */
+type Draft = Omit<VisitInput, "eventType"> & { eventType: EventTypeValue | "" };
 
 export function FeedbackForm({
   neighbornets,
   regionMap,
   homeSubArea,
   members,
+  recentCoVisitorIds = [],
   submitterName,
   editing,
 }: {
@@ -64,7 +70,11 @@ export function FeedbackForm({
   regionMap: RegionMap;
   /** The submitter's profile home — the sub-region the picker starts on. */
   homeSubArea: string | null;
+  /** Approved members, already sorted by name. */
   members: Option[];
+  /** Who this user last logged a visit with, most recent first — the top of
+   *  the co-visitor shortlist. */
+  recentCoVisitorIds?: string[];
   submitterName: string;
   editing?: { visitId: string; input: VisitInput } | null;
 }) {
@@ -73,12 +83,13 @@ export function FeedbackForm({
 
   // No neighbornet is pre-picked: the sub-region filter narrows the list
   // first, and defaulting to "the first in the catalog" invited mis-logs.
-  const initial: VisitInput = editing
+  const initial: Draft = editing
     ? editing.input
-    : { ...EMPTY_VISIT_INPUT, visitDate: todayIso() };
+    : { ...EMPTY_VISIT_INPUT, eventType: "", visitDate: "" };
 
-  const [form, setForm] = useState<VisitInput>(initial);
-  const [coPick, setCoPick] = useState("");
+  const [form, setForm] = useState<Draft>(initial);
+  const [coQuery, setCoQuery] = useState("");
+  const [coOpen, setCoOpen] = useState(false);
   const [area, setArea] = useState<string>(() => {
     if (editing) {
       const nn = neighbornets.find((n) => n.id === editing.input.neighbornetIds[0]);
@@ -113,17 +124,39 @@ export function FeedbackForm({
     return Math.round((tracked.filter(Boolean).length / tracked.length) * 100);
   }, [form]);
 
-  function set<K extends keyof VisitInput>(key: K, value: VisitInput[K]) {
+  function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function addCoVisitor() {
-    if (!coPick) return;
-    if (!form.coVisitorIds.includes(coPick)) {
-      set("coVisitorIds", [...form.coVisitorIds, coPick]);
+  /** BASH and SR_EVENT behave identically here and differ from a plain visit
+   *  (sub-region instead of neighbornets). Checked explicitly rather than as
+   *  "not VISIT", which would also catch the not-yet-picked state. */
+  const isSubRegionEvent =
+    form.eventType === "BASH" || form.eventType === "SR_EVENT";
+
+  function addCoVisitor(id: string) {
+    if (!form.coVisitorIds.includes(id)) {
+      set("coVisitorIds", [...form.coVisitorIds, id]);
     }
-    setCoPick("");
+    setCoQuery("");
   }
+
+  const recentSet = useMemo(
+    () => new Set(recentCoVisitorIds),
+    [recentCoVisitorIds],
+  );
+
+  const coMatches = useMemo(
+    () =>
+      buildCoSuggestions({
+        members,
+        recentIds: recentCoVisitorIds,
+        homeSubArea,
+        taken: form.coVisitorIds,
+        query: coQuery,
+      }),
+    [coQuery, members, form.coVisitorIds, recentCoVisitorIds, homeSubArea],
+  );
 
   // In the picker: matches the chosen sub-region, and (when logging several
   // at once) isn't already picked.
@@ -165,10 +198,7 @@ export function FeedbackForm({
         setNotice("Submission updated.");
         router.push("/feedback");
       } else {
-        setForm({
-          ...EMPTY_VISIT_INPUT,
-          visitDate: todayIso(),
-        });
+        setForm({ ...EMPTY_VISIT_INPUT, eventType: "", visitDate: "" });
         setNotice(successMsg);
       }
       router.refresh();
@@ -196,12 +226,20 @@ export function FeedbackForm({
     setError(null);
     setNotice(null);
     setDuplicates([]);
+    if (!form.eventType) {
+      setError("Pick what you're logging — a visit, a bash, or an SR event.");
+      return;
+    }
+    if (!form.visitDate) {
+      setError("Pick the date this happened.");
+      return;
+    }
     if (form.eventType === "VISIT" && form.neighbornetIds.length === 0) {
       setError("Pick at least one neighbornet.");
       return;
     }
     const subRegion = subRegionFromArea();
-    if (form.eventType !== "VISIT" && !subRegion) {
+    if (isSubRegionEvent && !subRegion) {
       setError("Pick which sub-region this was for.");
       return;
     }
@@ -209,7 +247,11 @@ export function FeedbackForm({
       setError("The feedback paragraph is required to submit.");
       return;
     }
-    const submission = { ...form, subRegion };
+    const submission: VisitInput = {
+      ...form,
+      eventType: form.eventType,
+      subRegion,
+    };
     startTransition(async () => {
       const res = editing
         ? await updateFeedback(editing.visitId, submission)
@@ -220,8 +262,12 @@ export function FeedbackForm({
 
   function resolveDuplicate(mode: "link" | "separate") {
     if (!duplicates.length) return;
+    // Duplicates only ever come back from a submit that already passed
+    // validation, so the event type is picked by the time we get here.
+    if (!form.eventType) return;
+    const resolved: VisitInput = { ...form, eventType: form.eventType };
     startTransition(async () => {
-      const res = await resolveJointDuplicates(form, duplicates, mode);
+      const res = await resolveJointDuplicates(resolved, duplicates, mode);
       handleResult(
         res,
         mode === "link" ? "Linked to the existing visit(s)." : "Feedback submitted.",
@@ -264,8 +310,9 @@ export function FeedbackForm({
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <div className="survey-time-note">
-          Takes about 5 minutes. Only the feedback paragraph at the bottom is
-          required — everything else is a bonus.
+          Takes about 5 minutes. What you&rsquo;re logging, the date, where it
+          was, and the feedback paragraph are required — the ratings and
+          numbers in between are a bonus.
         </div>
       </div>
 
@@ -342,7 +389,9 @@ export function FeedbackForm({
           </div>
 
           <div className="field full">
-            <label>What are you logging?</label>
+            <label>
+              What are you logging? <span className="required-tag">required</span>
+            </label>
             <div className="status-options">
               {EVENT_TYPES.map((t) => (
                 <button
@@ -358,18 +407,20 @@ export function FeedbackForm({
               ))}
             </div>
             <div className="survey-time-note" style={{ marginTop: 6 }}>
-              {EVENT_TYPE_HINT[form.eventType]}
+              {form.eventType
+                ? EVENT_TYPE_HINT[form.eventType]
+                : "Pick one to get started."}
             </div>
           </div>
 
           <div className="field full">
             <label>
-              {form.eventType !== "VISIT"
+              {isSubRegionEvent
                 ? "Sub-region"
                 : editing
                   ? "Neighbornet"
                   : "Neighbornet(s)"}{" "}
-              {form.eventType !== "VISIT" ? (
+              {isSubRegionEvent ? (
                 <span className="optional-tag">
                   which sub-region this event was for
                 </span>
@@ -386,7 +437,7 @@ export function FeedbackForm({
                 regionMap={regionMap}
                 value={area}
                 onChange={setArea}
-                emptyLabel={form.eventType !== "VISIT" ? "Choose a sub-region…" : "All sub-regions"}
+                emptyLabel={isSubRegionEvent ? "Choose a sub-region…" : "All sub-regions"}
                 allowWholeState
               />
               <select
@@ -416,7 +467,7 @@ export function FeedbackForm({
                 Add all {pickable.length} in this sub-region
               </button>
             )}
-            {form.eventType !== "VISIT" && (
+            {isSubRegionEvent && (
               <div className="survey-time-note" style={{ marginTop: 6 }}>
                 Which neighbornet(s) were involved{" "}
                 <span className="optional-tag">optional — for reference only, doesn&rsquo;t affect their status</span>
@@ -446,7 +497,7 @@ export function FeedbackForm({
               ))}
               {form.neighbornetIds.length === 0 && (
                 <span className="survey-time-note">
-                  {form.eventType !== "VISIT"
+                  {isSubRegionEvent
                     ? "No neighbornets picked — fine to leave blank."
                     : "Pick a sub-region, then the neighbornet."}
                 </span>
@@ -456,7 +507,10 @@ export function FeedbackForm({
 
           <div className="form-grid">
             <div className="field">
-              <label>Visit date</label>
+              <label>
+                {isSubRegionEvent ? "Event date" : "Visit date"}{" "}
+                <span className="required-tag">required</span>
+              </label>
               <input
                 type="date"
                 value={form.visitDate}
@@ -507,28 +561,47 @@ export function FeedbackForm({
                 optional — counts as their visit too
               </span>
             </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <select
-                value={coPick}
-                onChange={(e) => setCoPick(e.target.value)}
-              >
-                <option value="">Select a member…</option>
-                {members
-                  .filter((m) => !form.coVisitorIds.includes(m.id))
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                className="btn btn-secondary btn-small"
-                style={{ flexShrink: 0 }}
-                onClick={addCoVisitor}
-              >
-                Add
-              </button>
+            {/* A shortlist you can scroll, or type to narrow — rather than a
+                dropdown of the whole roster, which only gets worse as Cloud
+                grows. */}
+            <div className="typeahead">
+              <input
+                type="text"
+                value={coQuery}
+                onChange={(e) => setCoQuery(e.target.value)}
+                onFocus={() => setCoOpen(true)}
+                onBlur={() => setCoOpen(false)}
+                placeholder="Search or pick a name…"
+                autoComplete="off"
+              />
+              {coOpen && (
+                <div className="typeahead-results">
+                  {coMatches.length === 0 ? (
+                    <div className="typeahead-empty">
+                      {coQuery.trim()
+                        ? `No one matches “${coQuery.trim()}”`
+                        : "Everyone's already added."}
+                    </div>
+                  ) : (
+                    coMatches.map((m) => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        className="typeahead-item"
+                        // Pick on mousedown so the click lands before the
+                        // input's blur can close the list out from under it.
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => addCoVisitor(m.id)}
+                      >
+                        <span>{m.label}</span>
+                        {recentSet.has(m.id) && (
+                          <span className="optional-tag">visited with you</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div
               style={{

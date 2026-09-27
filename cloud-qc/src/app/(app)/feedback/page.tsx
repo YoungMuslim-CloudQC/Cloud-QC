@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { db } from "@/lib/db";
 import { requireApproved } from "@/lib/authz";
-import { memberName, getRegionMap } from "@/lib/queries";
+import { memberName, getRegionMap, getRecentCoVisitorIds } from "@/lib/queries";
 import { isoDate, statusMeta } from "@/lib/format";
 import {
   EMPTY_VISIT_INPUT,
@@ -22,8 +22,15 @@ export default async function FeedbackPage({
   const { edit } = await searchParams;
   const editId = typeof edit === "string" ? edit : null;
 
-  const [neighbornets, members, mySubmissions, editingVisit, regionMap, me] =
-    await Promise.all([
+  const [
+    neighbornets,
+    members,
+    mySubmissions,
+    editingVisit,
+    regionMap,
+    me,
+    recentCoVisitorIds,
+  ] = await Promise.all([
       db.neighbornet.findMany({
         where: { archivedAt: null },
         orderBy: [{ region: "asc" }, { subArea: "asc" }, { name: "asc" }],
@@ -32,7 +39,7 @@ export default async function FeedbackPage({
       db.user.findMany({
         where: { status: "APPROVED", role: { not: "COORDINATOR" }, id: { not: user.id } },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, homeSubArea: true },
       }),
       db.visit.findMany({
         where: { submittedById: user.id, deletedAt: null },
@@ -50,6 +57,7 @@ export default async function FeedbackPage({
         where: { id: user.id },
         select: { homeSubArea: true },
       }),
+      getRecentCoVisitorIds(user.id),
     ]);
 
   const canEditVisit =
@@ -99,7 +107,12 @@ export default async function FeedbackPage({
         }))}
         regionMap={regionMap}
         homeSubArea={me.homeSubArea}
-        members={members.map((m) => ({ id: m.id, label: memberName(m) }))}
+        members={members.map((m) => ({
+          id: m.id,
+          label: memberName(m),
+          subArea: m.homeSubArea,
+        }))}
+        recentCoVisitorIds={recentCoVisitorIds}
         submitterName={memberName(user)}
         editing={editing}
       />
