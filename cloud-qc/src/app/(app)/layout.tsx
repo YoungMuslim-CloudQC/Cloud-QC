@@ -18,7 +18,7 @@ export default async function AppLayout({
 }) {
   const user = await requireApprovedAny();
   const isAdmin = user.role === "ADMIN";
-  const isCoordinator = user.role === "COORDINATOR";
+  const isCoordinator = user.scope.viewOnly && user.role !== "ADMIN";
   const pendingCount = isAdmin
     ? await db.user.count({ where: { status: "PENDING" } })
     : 0;

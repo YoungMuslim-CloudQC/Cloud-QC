@@ -15,14 +15,33 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
+// The account-level role. Deliberately only these two: the coordinator-side
+// roles are *assignments* (a person can hold several, each with its own
+// scope), so they live in UserRoleAssignment rather than here. See RoleType.
 enum Role {
   MEMBER
   ADMIN
-  // Runs a neighbornet rather than QC-ing them: signs in to a read-only inbox
-  // of the feedback logged about the neighbornet(s) linked in
-  // NeighbornetCoordinator. Blocked from every QC-member screen and action
-  // (feedback, rotation, leaderboard, digests); still shares profile and
-  // site feedback with everyone else.
+}
+
+// The coordinator-side roles. All three are view-only: holding any of them
+// means the account can read feedback but never submit, edit or send it.
+enum RoleType {
+  // Runs one neighbornet. Full detail on that NN, nothing outside it.
+  COORDINATOR
+  // Runs a sub-region. Full detail on every NN inside it, plus a national
+  // rollup (status + averaged ratings, never the written feedback) of every
+  // NN elsewhere.
+  SR_COORDINATOR
+  // On a coordinator's or SRC's core team: sees exactly what the person who
+  // invited them sees, no more. Resolved by walking inheritsFromUserId.
+  CORE_TEAM
+}
+
+// What someone asked to be at signup. A request the admin rules on during
+// the existing PENDING -> APPROVED review, never a grant in itself.
+// SR_COORDINATOR is deliberately absent: admin-assigned only, after the fact.
+enum RequestedRole {
+  MEMBER
   COORDINATOR
 }
 
@@ -133,7 +152,15 @@ model User {
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
-  coordinates NeighbornetCoordinator[]
+  // What they asked to be at signup, and (for a coordinator request) which
+  // neighbornet they claimed. Both are hints for the admin reviewing their
+  // PENDING account — the real grant is a UserRoleAssignment.
+  requestedRole          RequestedRole?
+  requestedNeighbornetId String?
+
+  roleAssignments        UserRoleAssignment[] @relation("RoleAssignmentUser")
+  coreTeamOf             UserRoleAssignment[] @relation("RoleAssignmentInheritsFrom")
+  roleAssignmentsGranted UserRoleAssignment[] @relation("RoleAssignmentGrantedBy")
 
   accounts             Account[]
   sessions             Session[]
@@ -238,31 +265,62 @@ model Neighbornet {
   archivedById String?
   archivedBy   User?   @relation("NeighbornetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
 
-  visits        Visit[] // legacy single-NN pointer — see Visit.neighbornetId
-  visitLinks    VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
-  rotations     RotationAssignment[]
-  representedBy User[]                   @relation("UserRepresents")
-  coordinators  NeighbornetCoordinator[]
+  visits          Visit[] // legacy single-NN pointer — see Visit.neighbornetId
+  visitLinks      VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
+  rotations       RotationAssignment[]
+  representedBy   User[]               @relation("UserRepresents")
+  roleAssignments UserRoleAssignment[]
 
   @@index([stateCode])
   @@index([region, subArea])
   @@index([archivedAt])
 }
 
-// Which neighbornet(s) a COORDINATOR user runs. Set by an admin, or claimed at
-// signup (and confirmed when the admin approves the account).
-model NeighbornetCoordinator {
+// One held coordinator-side role. A person can hold several rows here (a
+// core-team seat and a coordinator seat, say), which is why this isn't a
+// field on User. Exactly one scope column is set per row, decided by
+// roleType — see RoleType for which.
+model UserRoleAssignment {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roleType RoleType
 
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation("RoleAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
 
-  neighbornetId String
-  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+  // COORDINATOR: the one neighbornet they run. A person holds at most one
+  // COORDINATOR row (enforced in code, not by a constraint, because the
+  // succession window deliberately puts *two people* on one neighbornet).
+  scopeNeighbornetId String?
+  scopeNeighbornet   Neighbornet? @relation(fields: [scopeNeighbornetId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, neighbornetId])
-  @@index([neighbornetId])
+  // SR_COORDINATOR: the sub-region they run. Same string vocabulary as
+  // Neighbornet.subArea — not a foreign key, exactly like Visit.subRegion.
+  scopeSubregion String?
+
+  // CORE_TEAM: whose visibility this seat borrows. Resolved by walking up
+  // until a non-CORE_TEAM assignment is found, so a chain still lands on a
+  // real scope (and so an outgoing coordinator's core team keeps working
+  // after the handoff re-seats them under the new coordinator).
+  inheritsFromUserId String?
+  inheritsFrom       User?   @relation("RoleAssignmentInheritsFrom", fields: [inheritsFromUserId], references: [id], onDelete: Cascade)
+
+  // Set on the OUTGOING coordinator's row when a handoff starts: both hold
+  // the neighbornet until this passes, then the nightly cron retires this
+  // row and re-seats them on the new coordinator's core team.
+  transitionEndsAt DateTime?
+
+  grantedById String?
+  grantedBy   User?   @relation("RoleAssignmentGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([roleType])
+  @@index([scopeNeighbornetId])
+  @@index([scopeSubregion])
+  @@index([inheritsFromUserId])
+  @@index([transitionEndsAt])
 }
 
 // Feedback about the Cloud QC site itself, left from any page: the person

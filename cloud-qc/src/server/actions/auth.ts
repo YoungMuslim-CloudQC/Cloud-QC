@@ -15,7 +15,9 @@ const signupSchema = z.object({
   // approves the account (and can correct the role/neighbornets) before it
   // can sign in, so this is a claim, not a grant.
   role: z.enum(["MEMBER", "COORDINATOR"]).default("MEMBER"),
-  neighbornetIds: z.array(z.string().min(1)).max(10).default([]),
+  // A coordinator runs exactly one neighbornet, so this is a single claim
+  // even though the form posts it as a list.
+  neighbornetIds: z.array(z.string().min(1)).max(1).default([]),
 });
 
 export type SignupState = {
@@ -91,22 +93,21 @@ export async function signup(
 
   const passwordHash = await hash(password, ARGON_OPTS);
 
+  // A request, never a grant: the account is created as a plain PENDING
+  // MEMBER either way. What they asked for is recorded so the admin sees it
+  // during the normal approval review, and the actual coordinator seat is
+  // only created there (see approveUser).
   await db.user.create({
     data: {
       name,
       email,
       passwordHash,
-      role: isCoordinator ? "COORDINATOR" : "MEMBER",
+      role: "MEMBER",
       status: "PENDING",
-      ...(isCoordinator
-        ? {
-            coordinates: {
-              create: [...new Set(neighbornetIds)].map((neighbornetId) => ({
-                neighbornetId,
-              })),
-            },
-          }
-        : {}),
+      requestedRole: isCoordinator ? "COORDINATOR" : "MEMBER",
+      requestedNeighbornetId: isCoordinator
+        ? ([...new Set(neighbornetIds)][0] ?? null)
+        : null,
     },
   });
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { db } from "@/lib/db";
-import { requireCoordinator } from "@/lib/authz";
+import { requireViewRole } from "@/lib/authz";
 import { memberName } from "@/lib/queries";
 import { isoDate, statusMeta } from "@/lib/format";
 import { EVENT_TYPE_LABEL } from "@/lib/visit-schema";
@@ -15,20 +15,32 @@ function rating(n: number | null) {
   return n == null ? "—" : `${n}/5`;
 }
 
-/** Read-only inbox of everything QC members have logged about the
- *  neighbornet(s) this coordinator runs. */
+/** Read-only inbox of everything QC has logged about the neighbornets this
+ *  person can see in full detail — their own NN for a coordinator, their
+ *  whole sub-region for an SRC, and whatever their inviter sees for a core
+ *  team member. */
 export default async function CoordinatorInboxPage({
   searchParams,
 }: PageProps<"/coordinator">) {
-  const user = await requireCoordinator();
+  const user = await requireViewRole();
   const { nn: nnParam } = await searchParams;
+  const { scope } = user;
 
-  const assignments = await db.neighbornetCoordinator.findMany({
-    where: { userId: user.id, neighbornet: { archivedAt: null } },
-    orderBy: { neighbornet: { name: "asc" } },
-    select: { neighbornet: { select: { id: true, name: true, subArea: true } } },
+  // Everything in scope, resolved to concrete neighbornets so the rest of
+  // the page doesn't care whether it came from an NN seat or a sub-region.
+  const myNns = await db.neighbornet.findMany({
+    where: {
+      archivedAt: null,
+      OR: [
+        { id: { in: scope.fullNeighbornetIds } },
+        ...(scope.fullSubregions.length
+          ? [{ subArea: { in: scope.fullSubregions } }]
+          : []),
+      ],
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, subArea: true },
   });
-  const myNns = assignments.map((a) => a.neighbornet);
 
   if (myNns.length === 0) {
     return (
@@ -36,9 +48,9 @@ export default async function CoordinatorInboxPage({
         <PageHead title="Feedback inbox" desc="Feedback about your neighbornet." />
         <div className="card" style={{ maxWidth: 640 }}>
           <div className="empty-state">
-            <strong>No neighbornet linked yet</strong>
-            An admin needs to link your account to the neighbornet you
-            coordinate before feedback shows up here.
+            <strong>Nothing linked yet</strong>
+            An admin needs to link your account to the neighbornet or
+            sub-region you look after before feedback shows up here.
           </div>
         </div>
       </>
@@ -53,10 +65,13 @@ export default async function CoordinatorInboxPage({
   const visits = await db.visit.findMany({
     where: {
       deletedAt: null,
-      // The credit-bearing link — a joint event touching this coordinator's
-      // NN still shows up here; a Bash/SR event never has one, so it can't.
+      // The credit-bearing link — a joint event touching one of these
+      // neighbornets still shows up here; a Bash/SR event never has one, so
+      // it can't.
       neighbornets: {
-        some: { neighbornetId: selected ? selected : { in: myNns.map((n) => n.id) } },
+        some: {
+          neighbornetId: selected ? selected : { in: myNns.map((n) => n.id) },
+        },
       },
     },
     orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
@@ -82,9 +97,17 @@ export default async function CoordinatorInboxPage({
         desc={
           myNns.length === 1
             ? `Everything QC has logged about ${myNns[0].name}.`
-            : "Everything QC has logged about your neighbornets."
+            : "Everything QC has logged about the neighbornets you look after."
         }
       />
+
+      {scope.nationalRollup && (
+        <div style={{ marginBottom: 16 }}>
+          <Link className="btn btn-secondary btn-small" href="/coordinator/national">
+            See how every other sub-region is doing →
+          </Link>
+        </div>
+      )}
 
       {myNns.length > 1 && (
         <div className="status-options" style={{ marginBottom: 16, maxWidth: 640 }}>

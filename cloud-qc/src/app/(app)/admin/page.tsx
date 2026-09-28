@@ -14,9 +14,14 @@ export default async function AdminPage() {
   const me = await requireAdmin();
 
   const withNns = {
-    coordinates: {
+    roleAssignments: {
       select: {
-        neighbornet: { select: { id: true, name: true, subArea: true } },
+        id: true,
+        roleType: true,
+        scopeSubregion: true,
+        transitionEndsAt: true,
+        scopeNeighbornet: { select: { id: true, name: true, subArea: true } },
+        inheritsFrom: { select: { id: true, name: true, email: true } },
       },
     },
   } as const;
@@ -38,9 +43,31 @@ export default async function AdminPage() {
         select: { id: true, name: true, subArea: true, region: true },
       }),
       getRegionMap(),
+
       db.siteFeedback.count({ where: { status: "NEW" } }),
       db.visitDispute.count({ where: { status: "PENDING" } }),
     ]);
+
+  // Resolve the neighbornets people claimed at signup, so the approval
+  // review can show "claims they coordinate Teaneck" rather than an id.
+  const requestedIds = [...pending, ...all]
+    .map((u) => u.requestedNeighbornetId)
+    .filter((id): id is string => Boolean(id));
+  const requestedNnName = new Map(
+    requestedIds.length
+      ? (
+          await db.neighbornet.findMany({
+            where: { id: { in: requestedIds } },
+            select: { id: true, name: true },
+          })
+        ).map((n) => [n.id, n.name] as const)
+      : [],
+  );
+  const claimNameByUser = new Map(
+    [...pending, ...all]
+      .filter((u) => u.requestedNeighbornetId)
+      .map((u) => [u.id, requestedNnName.get(u.requestedNeighbornetId!) ?? null] as const),
+  );
 
   return (
     <>
@@ -118,14 +145,16 @@ export default async function AdminPage() {
                 </div>
               </div>
               <div style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                {u.role === "COORDINATOR" ? (
+                {u.requestedRole === "COORDINATOR" ? (
                   <>
-                    <span className="badge badge-event">coordinator</span>
+                    <span className="badge badge-event">wants coordinator</span>
                     <div style={{ marginTop: 4 }}>
-                      Says they coordinate:{" "}
-                      {u.coordinates.length
-                        ? u.coordinates.map((c) => c.neighbornet.name).join(", ")
-                        : "—"}
+                      Claims they coordinate:{" "}
+                      {claimNameByUser.get(u.id) ?? "— (didn't say)"}
+                    </div>
+                    <div style={{ marginTop: 2 }}>
+                      Approving them creates the seat — confirm or change the
+                      neighbornet below.
                     </div>
                   </>
                 ) : u.passwordHash ? (
@@ -203,10 +232,20 @@ export default async function AdminPage() {
                 )}
               </div>
             </div>
-            {u.role === "COORDINATOR" && u.status === "APPROVED" && (
+            {u.status === "APPROVED" && u.role !== "ADMIN" && (
               <CoordinatorAssign
                 userId={u.id}
-                initialIds={u.coordinates.map((c) => c.neighbornet.id)}
+                initialId={
+                  u.roleAssignments.find((a) => a.roleType === "COORDINATOR")
+                    ?.scopeNeighbornet?.id ??
+                  (u.requestedRole === "COORDINATOR"
+                    ? (u.requestedNeighbornetId ?? null)
+                    : null)
+                }
+                initialSubregion={
+                  u.roleAssignments.find((a) => a.roleType === "SR_COORDINATOR")
+                    ?.scopeSubregion ?? null
+                }
                 neighbornets={neighbornets}
                 regionMap={regionMap}
               />

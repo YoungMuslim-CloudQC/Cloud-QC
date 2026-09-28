@@ -51,7 +51,7 @@ export default async function ProfilePage() {
           digestSubAreas={user.digestSubAreas}
           regionMap={regionMap}
           representingNeighbornetId={user.representingNeighbornetId}
-          isCoordinator={me.role === "COORDINATOR"}
+          isCoordinator={me.scope.viewOnly && me.role !== "ADMIN"}
           neighbornetOptions={neighbornetOptions}
         />
         {me.role === "ADMIN" && <SendTestDigestButton />}

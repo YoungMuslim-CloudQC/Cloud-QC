@@ -39,7 +39,7 @@ export async function rejectUser(formData: FormData) {
 export async function setUserRole(formData: FormData) {
   const me = await assertAdmin();
   const { userId } = idSchema.parse({ userId: formData.get("userId") });
-  const role = z.enum(["MEMBER", "ADMIN", "COORDINATOR"]).parse(formData.get("role"));
+  const role = z.enum(["MEMBER", "ADMIN"]).parse(formData.get("role"));
 
   if (userId === me.id && role !== "ADMIN") {
     throw new Error("You can't remove your own admin access.");
@@ -108,38 +108,89 @@ export async function adminUpdateMemberProfile(
   return { ok: true };
 }
 
-/** Replace the set of neighbornets a coordinator runs (their inbox is
- *  exactly this set). */
-export async function setCoordinatorNeighbornets(
+/** Make someone the coordinator of one neighbornet, replacing whichever
+ *  neighbornet they currently coordinate. A person holds at most one
+ *  COORDINATOR seat — a *neighbornet* can have two holders, but only through
+ *  the succession flow, never by an admin assigning a second person here. */
+export async function setCoordinatorNeighbornet(
   userId: string,
-  neighbornetIds: string[],
+  neighbornetId: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
-  await assertAdmin();
-  const ids = [...new Set(z.array(z.string().min(1)).max(50).parse(neighbornetIds))];
+  const me = await assertAdmin();
+  const id = neighbornetId
+    ? z.string().min(1).parse(neighbornetId)
+    : null;
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { id: true },
   });
-  if (!user || user.role !== "COORDINATOR") {
-    return { ok: false, error: "That account isn't a coordinator." };
-  }
-  const found = await db.neighbornet.count({
-    where: { id: { in: ids }, archivedAt: null },
-  });
-  if (found !== ids.length) {
-    return { ok: false, error: "One of those neighbornets isn't available." };
+  if (!user) return { ok: false, error: "That account no longer exists." };
+
+  if (id) {
+    const found = await db.neighbornet.count({
+      where: { id, archivedAt: null },
+    });
+    if (found !== 1) {
+      return { ok: false, error: "That neighbornet isn't available." };
+    }
   }
 
-  await db.$transaction([
-    db.neighbornetCoordinator.deleteMany({
-      where: { userId, neighbornetId: { notIn: ids } },
-    }),
-    db.neighbornetCoordinator.createMany({
-      data: ids.map((neighbornetId) => ({ userId, neighbornetId })),
-      skipDuplicates: true,
-    }),
-  ]);
+  await db.$transaction(async (tx) => {
+    await tx.userRoleAssignment.deleteMany({
+      where: { userId, roleType: "COORDINATOR" },
+    });
+    if (id) {
+      await tx.userRoleAssignment.create({
+        data: {
+          userId,
+          roleType: "COORDINATOR",
+          scopeNeighbornetId: id,
+          grantedById: me.id,
+        },
+      });
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/coordinator");
+  return { ok: true };
+}
+
+/** Make someone the SR coordinator of one sub-region (or clear it).
+ *  Admin-assigned only — never self-requestable at signup. */
+export async function setSrCoordinatorSubregion(
+  userId: string,
+  subregion: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await assertAdmin();
+  const sub = subregion ? z.string().trim().min(1).max(80).parse(subregion) : null;
+
+  if (sub) {
+    const exists = await db.neighbornet.count({
+      where: { subArea: sub, archivedAt: null },
+    });
+    if (exists === 0) {
+      return { ok: false, error: "No neighbornets are in that sub-region." };
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.userRoleAssignment.deleteMany({
+      where: { userId, roleType: "SR_COORDINATOR" },
+    });
+    if (sub) {
+      await tx.userRoleAssignment.create({
+        data: {
+          userId,
+          roleType: "SR_COORDINATOR",
+          scopeSubregion: sub,
+          grantedById: me.id,
+        },
+      });
+    }
+  });
+
   revalidatePath("/admin");
   revalidatePath("/coordinator");
   return { ok: true };

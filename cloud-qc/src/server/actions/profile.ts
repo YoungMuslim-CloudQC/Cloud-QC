@@ -23,7 +23,7 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<ProfileState> {
   const me = await assertApprovedAny();
-  const isCoordinator = me.role === "COORDINATOR";
+  const isCoordinator = me.scope.viewOnly && me.role !== "ADMIN";
 
   // Members only pick a sub-region; the state it sits in is derived here so
   // the two can never disagree.

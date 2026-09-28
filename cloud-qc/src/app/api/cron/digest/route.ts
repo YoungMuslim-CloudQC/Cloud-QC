@@ -1,3 +1,4 @@
+import { QC_MEMBER_WHERE } from "@/lib/role-access";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
   const candidates = await db.user.findMany({
     where: {
       status: "APPROVED",
-      role: { not: "COORDINATOR" },
+      ...QC_MEMBER_WHERE,
       digestCadence: { not: "OFF" },
     },
     select: {

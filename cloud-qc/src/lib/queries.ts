@@ -2,6 +2,8 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 
+import { QC_MEMBER_WHERE } from "@/lib/role-access";
+
 import { db } from "@/lib/db";
 import { hysteresisStatus } from "@/lib/neighbornet-status";
 
@@ -220,7 +222,7 @@ export type MemberStat = {
 export async function getTeamMemberStats(): Promise<MemberStat[]> {
   const [members, participants] = await Promise.all([
     db.user.findMany({
-      where: { status: "APPROVED", role: { not: "COORDINATOR" } },
+      where: { status: "APPROVED", ...QC_MEMBER_WHERE },
       orderBy: { name: "asc" },
       select: {
         id: true,
