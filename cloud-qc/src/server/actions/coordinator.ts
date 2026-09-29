@@ -120,7 +120,12 @@ export async function inviteCoreTeamMember(
 
   const existing = await db.user.findUnique({
     where: { email },
-    select: { id: true, status: true, name: true },
+    select: {
+      id: true,
+      status: true,
+      name: true,
+      roleAssignments: { select: { id: true } },
+    },
   });
 
   if (existing?.id === me.id) {
@@ -135,6 +140,22 @@ export async function inviteCoreTeamMember(
     if (already) {
       return { ok: false, error: "They're already on your core team." };
     }
+
+    // An approved account that holds no coordinator-side seat is a working
+    // QC member. Seating them here would make their account view-only and
+    // silently stop them logging visits — so it takes an admin, who can see
+    // the whole picture, rather than happening as a side effect of an
+    // invite. Someone can legitimately be both, but not by accident.
+    const isWorkingQcMember =
+      existing.status === "APPROVED" && existing.roleAssignments.length === 0;
+    if (isWorkingQcMember) {
+      return {
+        ok: false,
+        error:
+          `${existing.name ?? email} is on the Cloud QC team. Adding them here would stop them logging visits, so an admin has to set that up.`,
+      };
+    }
+
     await db.userRoleAssignment.create({
       data: {
         userId: existing.id,
@@ -146,10 +167,9 @@ export async function inviteCoreTeamMember(
     revalidatePath("/coordinator/team");
     return {
       ok: true,
-      notice:
-        existing.status === "APPROVED"
-          ? `${existing.name ?? email} is on your core team.`
-          : `${existing.name ?? email} is on your core team — their account is still waiting on admin approval.`,
+      notice: `${existing.name ?? email} is on your core team${
+        existing.status === "APPROVED" ? "." : " — their account is still waiting on admin approval."
+      }`,
     };
   }
 

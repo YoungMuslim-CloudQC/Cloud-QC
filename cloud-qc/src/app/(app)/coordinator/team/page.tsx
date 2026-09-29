@@ -24,17 +24,6 @@ export default async function CoreTeamPage() {
     },
   });
 
-  // Approved QC members and coordinators who aren't already seated — the
-  // "add someone already here" half of the invite.
-  const seatedIds = new Set(seats.map((s) => s.user.id));
-  const candidates = (
-    await db.user.findMany({
-      where: { status: "APPROVED", id: { not: user.id } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true },
-    })
-  ).filter((c) => !seatedIds.has(c.id));
-
   return (
     <>
       <BackLink href="/coordinator" label="Your neighbornet" />
@@ -85,11 +74,12 @@ export default async function CoreTeamPage() {
       <div className="card" style={{ maxWidth: 680 }}>
         <div className="section-label">Add someone</div>
         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 12px" }}>
-          Anyone already in Cloud QC joins your team straight away. A new email
-          creates an account that still needs an admin to approve it before
-          they can sign in.
+          Invite by email. They&rsquo;ll sign up with that address, and an admin
+          approves them before they can see anything. Someone already on the
+          Cloud QC team can&rsquo;t be added here — it would stop them logging
+          visits, so an admin sets that up instead.
         </p>
-        <CoreTeamManager mode="add" candidates={candidates} />
+        <CoreTeamManager mode="add" />
       </div>
     </>
   );

@@ -17,7 +17,8 @@ type NavKey =
   | "admin"
   | "inbox"
   | "coHome"
-  | "coreTeam";
+  | "coreTeam"
+  | "org";
 
 type NavDef = {
   key: NavKey;
@@ -155,6 +156,20 @@ const NAV: NavDef[] = [
     ),
   },
   {
+    key: "org",
+    href: "/org",
+    label: "Org map",
+    short: "Org",
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <rect x="9" y="3" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="3" y="16" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="15" y="16" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 8v4M6 16v-2h12v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     key: "profile",
     href: "/profile",
     label: "Profile",
@@ -182,8 +197,9 @@ const NAV: NavDef[] = [
 
 type Viewer = { isAdmin: boolean; isCoordinator: boolean };
 
-/** Coordinators get just their inbox + profile; members never see the inbox. */
-const COORDINATOR_KEYS: NavKey[] = ["coHome", "inbox", "coreTeam", "profile"];
+/** Coordinator-side accounts get their own small set; members never see any
+ *  of it. The org map is the one page both sides share. */
+const COORDINATOR_KEYS: NavKey[] = ["coHome", "inbox", "coreTeam", "org", "profile"];
 
 function visibleTo(n: NavDef, v: Viewer) {
   if (v.isCoordinator) return COORDINATOR_KEYS.includes(n.key);

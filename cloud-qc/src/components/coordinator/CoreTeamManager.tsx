@@ -10,19 +10,16 @@ import {
 
 const INITIAL: CoreTeamState = {};
 
-type Candidate = { id: string; name: string | null; email: string };
-
-/** Two ways onto a core team, one control: pick someone who's already in
- *  Cloud QC, or type an email that isn't here yet. Both post the same
- *  email field, so the server decides which path it is rather than the
- *  client claiming one. */
+/** Invite by email, and only by email. There's deliberately no roster to
+ *  pick from: browsing the Cloud QC team and seating one of them would make
+ *  that person's account view-only and stop them logging visits. People can
+ *  hold both roles, but an admin sets that up — it isn't something to land
+ *  on someone from here. */
 export function CoreTeamManager(
-  props:
-    | { mode: "add"; candidates: Candidate[] }
-    | { mode: "remove"; userId: string; name: string },
+  props: { mode: "add" } | { mode: "remove"; userId: string; name: string },
 ) {
   if (props.mode === "remove") return <RemoveButton {...props} />;
-  return <AddForm candidates={props.candidates} />;
+  return <AddForm />;
 }
 
 function RemoveButton({ userId, name }: { userId: string; name: string }) {
@@ -63,46 +60,22 @@ function RemoveButton({ userId, name }: { userId: string; name: string }) {
   );
 }
 
-function AddForm({ candidates }: { candidates: Candidate[] }) {
+function AddForm() {
   const [state, action, pending] = useActionState(inviteCoreTeamMember, INITIAL);
-  const [email, setEmail] = useState("");
 
   return (
     <form action={action}>
       {state.error && <div className="auth-msg error">{state.error}</div>}
       {state.ok && state.notice && <div className="auth-msg info">{state.notice}</div>}
 
-      {candidates.length > 0 && (
-        <div className="field">
-          <label htmlFor="ct-existing">Someone already in Cloud QC</label>
-          <select
-            id="ct-existing"
-            value=""
-            onChange={(e) => {
-              const c = candidates.find((x) => x.id === e.target.value);
-              if (c) setEmail(c.email);
-            }}
-          >
-            <option value="">Pick a person…</option>
-            {candidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name || c.email}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="field">
-        <label htmlFor="ct-email">Email</label>
+        <label htmlFor="ct-email">Their email</label>
         <input
           id="ct-email"
           name="email"
           type="email"
           required
           placeholder="name@youngmuslims.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
         />
       </div>
 
