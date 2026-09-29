@@ -38,7 +38,13 @@ async function getFreshUser(): Promise<SessionUser | null> {
     select: { role: true, status: true },
   });
   if (!row) return null;
-  return { ...user, role: row.role, status: row.status };
+  // Role.COORDINATOR is a deprecated leftover that nothing writes any more
+  // (coordinator-side roles are UserRoleAssignment rows now). No account
+  // carries it, but the enum value still exists in the database until the
+  // follow-up migration removes it, so narrow it away here rather than let
+  // it leak into SessionUser.
+  const role = row.role === "COORDINATOR" ? "MEMBER" : row.role;
+  return { ...user, role, status: row.status };
 }
 
 /** Same, plus their resolved view scope. */

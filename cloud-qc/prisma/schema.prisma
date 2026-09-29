@@ -21,6 +21,13 @@ datasource db {
 enum Role {
   MEMBER
   ADMIN
+  /// DEPRECATED — superseded by UserRoleAssignment. Nothing in this codebase
+  /// reads or writes it any more, but the value stays until the release that
+  /// removes it has shipped: the currently deployed build still filters on
+  /// `role != COORDINATOR`, and dropping the label out from under it took
+  /// /feedback and /team down once already. Drop it in a follow-up migration
+  /// once this branch is live.
+  COORDINATOR
 }
 
 // The coordinator-side roles. All three are view-only: holding any of them
@@ -101,6 +108,9 @@ enum DigestCadence {
   WEEKLY
   BIWEEKLY
   MONTHLY
+  // Every three months — the cadence coordinators asked for, so a neighbornet
+  // gets one "here's the term you just had" summary rather than a drip.
+  TRIMESTER
 }
 
 enum NotificationChannel {
@@ -158,9 +168,16 @@ model User {
   requestedRole          RequestedRole?
   requestedNeighbornetId String?
 
-  roleAssignments        UserRoleAssignment[] @relation("RoleAssignmentUser")
-  coreTeamOf             UserRoleAssignment[] @relation("RoleAssignmentInheritsFrom")
-  roleAssignmentsGranted UserRoleAssignment[] @relation("RoleAssignmentGrantedBy")
+  // Email me as soon as QC logs feedback about a neighbornet I look after,
+  // separately from the periodic digest above. Only ever consulted for
+  // someone holding a coordinator-side seat.
+  alertOnNewFeedback Boolean @default(true)
+
+  roleAssignments        UserRoleAssignment[]     @relation("RoleAssignmentUser")
+  coreTeamOf             UserRoleAssignment[]     @relation("RoleAssignmentInheritsFrom")
+  roleAssignmentsGranted UserRoleAssignment[]     @relation("RoleAssignmentGrantedBy")
+  visitReviews           CoordinatorVisitReview[]
+  legacyCoordinates      NeighbornetCoordinator[]
 
   accounts             Account[]
   sessions             Session[]
@@ -265,11 +282,12 @@ model Neighbornet {
   archivedById String?
   archivedBy   User?   @relation("NeighbornetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
 
-  visits          Visit[] // legacy single-NN pointer — see Visit.neighbornetId
-  visitLinks      VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
-  rotations       RotationAssignment[]
-  representedBy   User[]               @relation("UserRepresents")
-  roleAssignments UserRoleAssignment[]
+  visits             Visit[] // legacy single-NN pointer — see Visit.neighbornetId
+  visitLinks         VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
+  rotations          RotationAssignment[]
+  representedBy      User[]                   @relation("UserRepresents")
+  roleAssignments    UserRoleAssignment[]
+  legacyCoordinators NeighbornetCoordinator[]
 
   @@index([stateCode])
   @@index([region, subArea])
@@ -321,6 +339,42 @@ model UserRoleAssignment {
   @@index([scopeSubregion])
   @@index([inheritsFromUserId])
   @@index([transitionEndsAt])
+}
+
+/// DEPRECATED — superseded by UserRoleAssignment (roleType COORDINATOR).
+/// Unused by this codebase and always empty; kept only so the schema matches
+/// the database the currently deployed build still queries. Dropped in a
+/// follow-up migration once this branch has shipped.
+model NeighbornetCoordinator {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  neighbornetId String
+  neighbornet   Neighbornet @relation(fields: [neighbornetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, neighbornetId])
+  @@index([neighbornetId])
+}
+
+// "I've read this one." Per person rather than per neighbornet: a
+// coordinator and each of their core team work through the inbox on their
+// own, so one of them clearing a visit must not clear it for the others.
+model CoordinatorVisitReview {
+  id         String   @id @default(cuid())
+  reviewedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, visitId])
+  @@index([userId])
+  @@index([visitId])
 }
 
 // Feedback about the Cloud QC site itself, left from any page: the person
@@ -403,11 +457,12 @@ model Visit {
   submittedById String
   submittedBy   User   @relation("VisitSubmittedBy", fields: [submittedById], references: [id])
 
-  participants  VisitParticipant[]
-  comments      VisitComment[]
-  history       VisitHistory[]
-  disputes      VisitDispute[]     @relation("DisputedVisit")
-  ownedDisputes VisitDispute[]     @relation("DisputeOwnVisit")
+  participants       VisitParticipant[]
+  comments           VisitComment[]
+  history            VisitHistory[]
+  disputes           VisitDispute[]           @relation("DisputedVisit")
+  ownedDisputes      VisitDispute[]           @relation("DisputeOwnVisit")
+  coordinatorReviews CoordinatorVisitReview[]
 
   @@index([neighbornetId, visitDate])
   @@index([submittedById])

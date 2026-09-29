@@ -9,6 +9,8 @@ export const CADENCE_DAYS: Record<Exclude<DigestCadence, "OFF">, number> = {
   WEEKLY: 7,
   BIWEEKLY: 14,
   MONTHLY: 30,
+  // A trimester — one summary per school term, for coordinators.
+  TRIMESTER: 91,
 };
 
 const SEVERITY: Record<string, number> = { URGENT: 2, NEEDS_FOLLOWUP: 1 };

@@ -13,13 +13,17 @@ import { flattenRegionMap, parseArea, subValue } from "@/lib/sub-regions";
 
 const INITIAL: ProfileState = {};
 
-type Cadence = "OFF" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
+type Cadence = "OFF" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "TRIMESTER";
 type Channel = "EMAIL" | "SMS" | "BOTH";
 
-const CADENCE_LABEL: Record<"WEEKLY" | "BIWEEKLY" | "MONTHLY", string> = {
+const CADENCE_LABEL: Record<
+  "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "TRIMESTER",
+  string
+> = {
   WEEKLY: "every week",
   BIWEEKLY: "every two weeks",
   MONTHLY: "every month",
+  TRIMESTER: "every three months",
 };
 
 /** `isNewSelection`: true when this cadence differs from what's already
@@ -337,6 +341,7 @@ export function ProfileForm({
                 ["WEEKLY", "Weekly"],
                 ["BIWEEKLY", "Biweekly"],
                 ["MONTHLY", "Monthly"],
+                ["TRIMESTER", "Every 3 months"],
               ] as const
             ).map(([value, label]) => (
               <label

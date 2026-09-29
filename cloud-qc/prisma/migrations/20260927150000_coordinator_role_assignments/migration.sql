@@ -4,29 +4,10 @@ CREATE TYPE "RoleType" AS ENUM ('COORDINATOR', 'SR_COORDINATOR', 'CORE_TEAM');
 -- CreateEnum
 CREATE TYPE "RequestedRole" AS ENUM ('MEMBER', 'COORDINATOR');
 
--- AlterEnum
-BEGIN;
-CREATE TYPE "Role_new" AS ENUM ('MEMBER', 'ADMIN');
-ALTER TABLE "public"."User" ALTER COLUMN "role" DROP DEFAULT;
-ALTER TABLE "User" ALTER COLUMN "role" TYPE "Role_new" USING ("role"::text::"Role_new");
-ALTER TYPE "Role" RENAME TO "Role_old";
-ALTER TYPE "Role_new" RENAME TO "Role";
-DROP TYPE "public"."Role_old";
-ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'MEMBER';
-COMMIT;
-
--- DropForeignKey
-ALTER TABLE "NeighbornetCoordinator" DROP CONSTRAINT "NeighbornetCoordinator_neighbornetId_fkey";
-
--- DropForeignKey
-ALTER TABLE "NeighbornetCoordinator" DROP CONSTRAINT "NeighbornetCoordinator_userId_fkey";
-
 -- AlterTable
 ALTER TABLE "User" ADD COLUMN     "requestedNeighbornetId" TEXT,
 ADD COLUMN     "requestedRole" "RequestedRole";
 
--- DropTable
-DROP TABLE "NeighbornetCoordinator";
 
 -- CreateTable
 CREATE TABLE "UserRoleAssignment" (
