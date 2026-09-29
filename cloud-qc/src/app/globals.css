@@ -883,13 +883,27 @@ label {
 .oops-sprite-img {
   position: absolute;
   inset: 0;
-  background-image: var(--oops-sprite, url("/pixel-karim.png"));
-  background-size: contain;
-  background-position: bottom center;
-  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
   /* Keep the pixels crisp instead of letting the browser smooth them. */
   image-rendering: pixelated;
+  object-fit: contain;
+  object-position: bottom center;
   animation: oops-bob 2.6s ease-in-out infinite;
+}
+/* Names whichever outfit turned up — the joke only lands if you can see
+   it changed. */
+.oops-costume {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -22px;
+  text-align: center;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 /* The ground shadow squashes as the sprite rises — what sells the bob. */
 .oops-sprite-shadow {

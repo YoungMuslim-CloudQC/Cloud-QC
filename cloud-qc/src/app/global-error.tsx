@@ -1,5 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
+import {
+  drawMascot,
+  randomCostume,
+  SPRITE_H,
+  SPRITE_W,
+} from "@/lib/pixel-mascot";
+
 /**
  * The last line of defence: this replaces the root layout, so it renders its
  * own <html>/<body> and can't assume globals.css or the theme variables ever
@@ -13,6 +22,15 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+
+  // Outfit chosen inside the effect, never during render, so the server and
+  // the browser can't disagree about which one it is.
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (ctx) drawMascot(ctx, randomCostume());
+  }, []);
+
   return (
     <html lang="en">
       <body
@@ -58,16 +76,19 @@ export default function GlobalError({
               animation: "ge-shadow 2.6s ease-in-out infinite",
             }}
           />
-          <div
+          <canvas
+            ref={ref}
             className="ge-sprite"
+            width={SPRITE_W}
+            height={SPRITE_H}
             style={{
               position: "absolute",
               inset: 0,
-              backgroundImage: "url(/pixel-karim.png)",
-              backgroundSize: "contain",
-              backgroundPosition: "bottom center",
-              backgroundRepeat: "no-repeat",
+              width: "100%",
+              height: "100%",
               imageRendering: "pixelated",
+              objectFit: "contain",
+              objectPosition: "bottom center",
               animation: "ge-bob 2.6s ease-in-out infinite",
             }}
           />
