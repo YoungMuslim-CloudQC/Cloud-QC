@@ -1732,6 +1732,113 @@ tr:last-child td {
    sub-region checkboxes (closed by default — there are ~30 of them). */
 /* Row under the dashboard's neighbornet grid: the ways out of the short
    list (more in this area / show all / browse). */
+/* ================= COORDINATOR ================= */
+/* The inbox earns the full window: these are long read-once cards, and at
+   1180px it was one narrow column with the rest of the screen empty.
+   Opted into per-page rather than widening .main everywhere. */
+.main.wide {
+  max-width: none;
+}
+
+/* Pinterest-style masonry. CSS columns rather than grid, because the cards
+   are wildly different heights — one visit is two lines, the next is six
+   paragraphs — and columns flow them without leaving gaps. */
+.feed-masonry {
+  column-width: 340px;
+  column-gap: 16px;
+}
+.feed-masonry > * {
+  break-inside: avoid;
+  page-break-inside: avoid; /* Safari wants both */
+  margin: 0 0 16px;
+  display: inline-block;
+  width: 100%;
+}
+
+.co-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.co-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.co-stat-label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.co-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.co-stat-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+/* The unreviewed tile is the one that wants acting on, so it's the only
+   one that gets the accent. */
+.co-stat.attention {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+.co-stat.attention .co-stat-value {
+  color: var(--accent);
+}
+
+.co-nn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+}
+.co-nn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.co-nn-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.co-nn-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.co-nn-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  font-size: 12.5px;
+  margin: 0;
+}
+.co-nn-rows dt {
+  color: var(--text-muted);
+}
+.co-nn-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Marks a card in the inbox this person hasn't ticked off yet. */
+.unread-rail {
+  border-left: 3px solid var(--accent);
+}
+
 .nn-board-more {
   display: flex;
   flex-wrap: wrap;
