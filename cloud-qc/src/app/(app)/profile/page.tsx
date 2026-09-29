@@ -22,6 +22,7 @@ export default async function ProfilePage() {
         homeSubArea: true,
         digestSubAreas: true,
         representingNeighbornetId: true,
+        alertOnNewFeedback: true,
       },
     }),
     getRegionMap(),
@@ -51,6 +52,7 @@ export default async function ProfilePage() {
           digestSubAreas={user.digestSubAreas}
           regionMap={regionMap}
           representingNeighbornetId={user.representingNeighbornetId}
+          alertOnNewFeedback={user.alertOnNewFeedback}
           isCoordinator={me.scope.viewOnly && me.role !== "ADMIN"}
           neighbornetOptions={neighbornetOptions}
         />
