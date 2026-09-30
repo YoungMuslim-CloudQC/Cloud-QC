@@ -168,6 +168,12 @@ model User {
   requestedRole          RequestedRole?
   requestedNeighbornetId String?
 
+  // The newest release note this person has seen. Compared against the
+  // latest id in lib/changelog.ts to decide whether to pop "what's new" —
+  // stored per user rather than in localStorage so it follows them across
+  // devices and can't be lost by clearing site data.
+  lastSeenChangelog String?
+
   // Email me as soon as QC logs feedback about a neighbornet I look after,
   // separately from the periodic digest above. Only ever consulted for
   // someone holding a coordinator-side seat.

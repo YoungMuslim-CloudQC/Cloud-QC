@@ -401,8 +401,7 @@ export function ProfileForm({
               {(
                 [
                   ["OFF", "Off"],
-                  ["MONTHLY", "Monthly"],
-                  ["TRIMESTER", "Every 3 months"],
+                  ["WEEKLY", "Weekly"],
                 ] as const
               ).map(([value, label]) => (
                 <label
@@ -423,9 +422,17 @@ export function ProfileForm({
               ))}
             </div>
             <div className="survey-time-note" style={{ marginTop: 10, marginBottom: 14 }}>
-              {cadence === "OFF"
-                ? "No summary emails."
-                : `A summary of every visit logged for your neighbornet, ${CADENCE_LABEL[cadence]}.`}
+              {cadence === "OFF" ? (
+                "No summary emails."
+              ) : (
+                <>
+                  Sent weekly, but each one covers{" "}
+                  <strong>the whole trimester so far</strong> — not just the
+                  last seven days. So you get a regular reminder, and the
+                  full picture of the term every time, rather than having to
+                  stitch the weeks together yourself.
+                </>
+              )}
             </div>
 
             <label

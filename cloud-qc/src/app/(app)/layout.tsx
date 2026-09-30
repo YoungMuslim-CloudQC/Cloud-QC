@@ -11,6 +11,8 @@ import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SiteFeedbackWidget } from "@/components/site-feedback/SiteFeedbackWidget";
 import { ViewAsBanner } from "@/components/ViewAsBanner";
+import { WhatsNew } from "@/components/WhatsNew";
+import { hasUnseenRelease, LATEST_RELEASE } from "@/lib/changelog";
 
 export default async function AppLayout({
   children,
@@ -25,6 +27,19 @@ export default async function AppLayout({
     : 0;
 
   const displayName = user.name || user.email || "Member";
+
+  // Announce a release only to people who were already here before it —
+  // someone signing in for the first time wants the app, not a changelog.
+  // Suppressed while an admin is viewing as someone: it'd be announcing to
+  // the wrong person, against the wrong read state.
+  const seen = user.impersonating
+    ? null
+    : await db.user.findUnique({
+        where: { id: user.id },
+        select: { lastSeenChangelog: true },
+      });
+  const unseenRelease =
+    seen && hasUnseenRelease(seen.lastSeenChangelog) ? LATEST_RELEASE : null;
 
   return (
     <div className={`app${user.impersonating ? " has-view-as" : ""}`}>
@@ -64,6 +79,7 @@ export default async function AppLayout({
       <main className="main">{children}</main>
 
       <SiteFeedbackWidget />
+      {unseenRelease && <WhatsNew release={unseenRelease} />}
     </div>
   );
 }
