@@ -4,7 +4,19 @@
  *  server wrapper (lib/role-access.ts) does the loading and hands the rows in.
  */
 
-export type RoleTypeValue = "COORDINATOR" | "SR_COORDINATOR" | "CORE_TEAM";
+export type RoleTypeValue =
+  | "COORDINATOR"
+  | "SR_COORDINATOR"
+  | "CORE_TEAM"
+  | "CLOUD_LEAD";
+
+/** The seats that make an account read-only. CLOUD_LEAD is deliberately
+ *  absent: a lead is a QC member who also leads, so they keep submitting. */
+const VIEW_ONLY_ROLES: RoleTypeValue[] = [
+  "COORDINATOR",
+  "SR_COORDINATOR",
+  "CORE_TEAM",
+];
 
 export type RoleAssignmentRecord = {
   userId: string;
@@ -31,6 +43,10 @@ export type ViewScope = {
    *  averaged ratings for every NN anywhere, never the written feedback.
    *  SR coordinators only (and their core teams, by inheritance). */
   nationalRollup: boolean;
+  /** Leads the Cloud QC team: sees every member's activity. Additive — it
+   *  never restricts anything, so it sits alongside viewOnly rather than
+   *  feeding into it. */
+  cloudLead: boolean;
 };
 
 export const EMPTY_SCOPE: ViewScope = {
@@ -38,6 +54,7 @@ export const EMPTY_SCOPE: ViewScope = {
   fullNeighbornetIds: [],
   fullSubregions: [],
   nationalRollup: false,
+  cloudLead: false,
 };
 
 /** A core-team seat can point at someone who themselves holds only a
@@ -55,6 +72,7 @@ export function resolveViewScope(
   const fullNeighbornetIds = new Set<string>();
   const fullSubregions = new Set<string>();
   let nationalRollup = false;
+  let cloudLead = false;
   let held = 0;
 
   const visited = new Set<string>();
@@ -64,9 +82,14 @@ export function resolveViewScope(
     visited.add(uid);
 
     for (const a of assignmentsByUser.get(uid) ?? []) {
-      if (uid === userId) held++;
+      // Only a view-only seat counts toward "this account can't submit".
+      if (uid === userId && VIEW_ONLY_ROLES.includes(a.roleType)) held++;
 
-      if (a.roleType === "COORDINATOR") {
+      if (a.roleType === "CLOUD_LEAD") {
+        // Not inheritable: leading the QC team isn't something a core-team
+        // seat borrows, so it only applies to the person who holds it.
+        if (uid === userId) cloudLead = true;
+      } else if (a.roleType === "COORDINATOR") {
         if (a.scopeNeighbornetId) fullNeighbornetIds.add(a.scopeNeighbornetId);
       } else if (a.roleType === "SR_COORDINATOR") {
         if (a.scopeSubregion) fullSubregions.add(a.scopeSubregion);
@@ -87,6 +110,7 @@ export function resolveViewScope(
     fullNeighbornetIds: [...fullNeighbornetIds].sort(),
     fullSubregions: [...fullSubregions].sort(),
     nationalRollup,
+    cloudLead,
   };
 }
 

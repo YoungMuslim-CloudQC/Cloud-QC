@@ -163,6 +163,15 @@ export async function requireViewRole(): Promise<ScopedUser> {
   return user;
 }
 
+/** Requires a Cloud Lead (or an admin). Note this goes through
+ *  requireApproved, not requireApprovedAny: a lead is a QC member, so they
+ *  belong on the member side of the app rather than the view-only side. */
+export async function requireCloudLead(): Promise<ScopedUser> {
+  const user = await requireApproved();
+  if (user.role !== "ADMIN" && !user.scope.cloudLead) redirect("/dashboard");
+  return user;
+}
+
 /** Requires someone who can see the national rollup: an SR coordinator, one
  *  of their core team, or an admin. */
 export async function requireNationalRollup(): Promise<ScopedUser> {

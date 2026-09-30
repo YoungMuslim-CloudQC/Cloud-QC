@@ -18,7 +18,8 @@ type NavKey =
   | "inbox"
   | "coHome"
   | "coreTeam"
-  | "org";
+  | "org"
+  | "lead";
 
 type NavDef = {
   key: NavKey;
@@ -29,6 +30,8 @@ type NavDef = {
   admin?: boolean;
   /** Only coordinators see this; members never do. */
   coordinatorOnly?: boolean;
+  /** Only Cloud Leads (and admins) see this. */
+  leadOnly?: boolean;
   primaryMobile?: boolean;
 };
 
@@ -156,6 +159,20 @@ const NAV: NavDef[] = [
     ),
   },
   {
+    key: "lead",
+    href: "/lead",
+    // Not "Cloud team" — that's already the leaderboard at /team, and two
+    // near-identical items in one sidebar is its own bug.
+    label: "Team overview",
+    short: "Overview",
+    leadOnly: true,
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <path d="M4 19V9M10 19V5M16 19v-7M20 19H3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     key: "org",
     href: "/org",
     label: "Org map",
@@ -195,7 +212,7 @@ const NAV: NavDef[] = [
   },
 ];
 
-type Viewer = { isAdmin: boolean; isCoordinator: boolean };
+type Viewer = { isAdmin: boolean; isCoordinator: boolean; isLead?: boolean };
 
 /** Coordinator-side accounts get their own small set; members never see any
  *  of it. The org map is the one page both sides share. */
@@ -204,6 +221,7 @@ const COORDINATOR_KEYS: NavKey[] = ["coHome", "inbox", "coreTeam", "org", "profi
 function visibleTo(n: NavDef, v: Viewer) {
   if (v.isCoordinator) return COORDINATOR_KEYS.includes(n.key);
   if (n.coordinatorOnly) return false;
+  if (n.leadOnly) return Boolean(v.isLead) || v.isAdmin;
   return !n.admin || v.isAdmin;
 }
 
@@ -218,16 +236,18 @@ function isActive(pathname: string, href: string) {
 export function SidebarNav({
   isAdmin,
   isCoordinator = false,
+  isLead = false,
   pendingCount,
 }: {
   isAdmin: boolean;
   isCoordinator?: boolean;
+  isLead?: boolean;
   pendingCount: number;
 }) {
   const pathname = usePathname();
   return (
     <nav>
-      {NAV.filter((n) => visibleTo(n, { isAdmin, isCoordinator })).map((n) => (
+      {NAV.filter((n) => visibleTo(n, { isAdmin, isCoordinator, isLead })).map((n) => (
         <Link
           key={n.key}
           href={n.href}
@@ -247,14 +267,16 @@ export function SidebarNav({
 export function MobileNav({
   isAdmin,
   isCoordinator = false,
+  isLead = false,
 }: {
   isAdmin: boolean;
   isCoordinator?: boolean;
+  isLead?: boolean;
 }) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const viewer = { isAdmin, isCoordinator };
+  const viewer = { isAdmin, isCoordinator, isLead };
   const primary = NAV.filter((n) => n.primaryMobile && visibleTo(n, viewer));
   const overflow = NAV.filter((n) => !n.primaryMobile && visibleTo(n, viewer));
   const overflowActive = overflow.some((n) => isActive(pathname, n.href));

@@ -254,6 +254,7 @@ export default async function AdminPage() {
                     ? (u.requestedNeighbornetId ?? null)
                     : null)
                 }
+                initialCloudLead={u.roleAssignments.some((a) => a.roleType === "CLOUD_LEAD")}
                 initialSubregion={
                   u.roleAssignments.find((a) => a.roleType === "SR_COORDINATOR")
                     ?.scopeSubregion ?? null

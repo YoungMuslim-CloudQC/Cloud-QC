@@ -157,6 +157,41 @@ export async function setCoordinatorNeighbornet(
   return { ok: true };
 }
 
+/** Make someone a Cloud Lead, or take it away. Unlike the coordinator-side
+ *  seats this grants rather than restricts: a lead keeps every QC ability
+ *  and gains a view of the whole team, so it's safe to hand to a working
+ *  member without cutting off their own work. */
+export async function setCloudLead(
+  userId: string,
+  isLead: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await assertAdmin();
+  const id = z.string().min(1).parse(userId);
+
+  const user = await db.user.findUnique({ where: { id }, select: { id: true } });
+  if (!user) return { ok: false, error: "That account no longer exists." };
+
+  if (isLead) {
+    const already = await db.userRoleAssignment.findFirst({
+      where: { userId: id, roleType: "CLOUD_LEAD" },
+      select: { id: true },
+    });
+    if (!already) {
+      await db.userRoleAssignment.create({
+        data: { userId: id, roleType: "CLOUD_LEAD", grantedById: me.id },
+      });
+    }
+  } else {
+    await db.userRoleAssignment.deleteMany({
+      where: { userId: id, roleType: "CLOUD_LEAD" },
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/lead");
+  return { ok: true };
+}
+
 /** Make someone the SR coordinator of one sub-region (or clear it).
  *  Admin-assigned only — never self-requestable at signup. */
 export async function setSrCoordinatorSubregion(

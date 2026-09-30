@@ -28,6 +28,42 @@ const coreTeam = (userId: string, under: string): RoleAssignmentRecord => ({
   roleType: "CORE_TEAM",
   inheritsFromUserId: under,
 });
+const cloudLead = (userId: string): RoleAssignmentRecord => ({
+  userId,
+  roleType: "CLOUD_LEAD",
+});
+
+describe("cloud lead", () => {
+  it("does NOT make the account view-only — a lead still does QC work", () => {
+    const scope = resolveViewScope("u1", byUser(cloudLead("u1")));
+    expect(scope.cloudLead).toBe(true);
+    expect(scope.viewOnly).toBe(false);
+  });
+
+  it("grants no neighbornet visibility on its own", () => {
+    const scope = resolveViewScope("u1", byUser(cloudLead("u1")));
+    expect(scope.fullNeighbornetIds).toEqual([]);
+    expect(scope.fullSubregions).toEqual([]);
+    expect(scope.nationalRollup).toBe(false);
+  });
+
+  it("still goes view-only if they also hold a coordinator seat", () => {
+    const scope = resolveViewScope(
+      "u1",
+      byUser(cloudLead("u1"), coordinator("u1", "nn-a")),
+    );
+    expect(scope.cloudLead).toBe(true);
+    expect(scope.viewOnly).toBe(true);
+  });
+
+  it("is not inherited by a core team member", () => {
+    const scope = resolveViewScope(
+      "helper",
+      byUser(cloudLead("boss"), coreTeam("helper", "boss")),
+    );
+    expect(scope.cloudLead).toBe(false);
+  });
+});
 
 describe("resolveViewScope", () => {
   it("gives someone with no assignments nothing, and leaves them able to submit", () => {
@@ -37,6 +73,7 @@ describe("resolveViewScope", () => {
       fullNeighbornetIds: [],
       fullSubregions: [],
       nationalRollup: false,
+      cloudLead: false,
     });
   });
 

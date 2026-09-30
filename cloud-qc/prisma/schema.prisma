@@ -42,6 +42,11 @@ enum RoleType {
   // On a coordinator's or SRC's core team: sees exactly what the person who
   // invited them sees, no more. Resolved by walking inheritsFromUserId.
   CORE_TEAM
+  // Leads the Cloud QC team itself. The one role here that is NOT view-only:
+  // a lead is a QC member who also leads, so they keep logging visits,
+  // rotation and the leaderboard, and gain a view of the whole team. Every
+  // other value in this enum makes an account read-only; this one doesn't.
+  CLOUD_LEAD
 }
 
 // What someone asked to be at signup. A request the admin rules on during

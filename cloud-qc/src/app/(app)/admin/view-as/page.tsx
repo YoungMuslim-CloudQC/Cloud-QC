@@ -14,6 +14,7 @@ const ROLE_LABEL = {
   SR_COORDINATOR: "SR coordinator",
   COORDINATOR: "Coordinator",
   CORE_TEAM: "Core team",
+  CLOUD_LEAD: "Cloud Lead",
 } as const;
 
 /** Pick someone to see the app as. Admin-only, and strictly a look: every

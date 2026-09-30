@@ -9,35 +9,43 @@ import {
   type PickableNeighbornet,
 } from "@/components/NeighbornetPicker";
 import {
+  setCloudLead,
   setCoordinatorNeighbornet,
   setSrCoordinatorSubregion,
 } from "@/server/actions/admin";
 
-/** The two coordinator-side seats an admin can hand out directly: one
- *  neighbornet (COORDINATOR) and/or one sub-region (SR_COORDINATOR). Core
- *  team seats aren't set here — a coordinator or SRC invites those
- *  themselves. Either seat makes the account view-only. */
+/** The roles an admin hands out directly: one neighbornet (COORDINATOR),
+ *  one sub-region (SR_COORDINATOR), and Cloud Lead. Core team seats aren't
+ *  set here — a coordinator or SRC invites those themselves.
+ *
+ *  The two coordinator-side seats make the account view-only; Cloud Lead
+ *  deliberately does not, so it can go to a working QC member without
+ *  cutting off their own work. */
 export function CoordinatorAssign({
   userId,
   initialId,
   initialSubregion,
+  initialCloudLead = false,
   neighbornets,
   regionMap,
 }: {
   userId: string;
   initialId: string | null;
   initialSubregion: string | null;
+  initialCloudLead?: boolean;
   neighbornets: PickableNeighbornet[];
   regionMap: RegionMap;
 }) {
   const [ids, setIds] = useState<string[]>(initialId ? [initialId] : []);
   const [subregion, setSubregion] = useState(initialSubregion ?? "");
+  const [lead, setLead] = useState(initialCloudLead);
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
   const subAreas = flattenRegionMap(regionMap).map((s) => s.subArea);
   const nnDirty = (ids[0] ?? null) !== initialId;
   const subDirty = subregion !== (initialSubregion ?? "");
+  const leadDirty = lead !== initialCloudLead;
 
   function save() {
     setMsg(null);
@@ -50,6 +58,10 @@ export function CoordinatorAssign({
       if (subDirty) {
         const res = await setSrCoordinatorSubregion(userId, subregion || null);
         if (!res.ok) results.push(res.error ?? "Couldn't set the sub-region.");
+      }
+      if (leadDirty) {
+        const res = await setCloudLead(userId, lead);
+        if (!res.ok) results.push(res.error ?? "Couldn't set Cloud Lead.");
       }
       setMsg(results.length ? results.join(" ") : "Saved.");
     });
@@ -88,12 +100,27 @@ export function CoordinatorAssign({
         ))}
       </select>
 
+      <label
+        className="coord-assign-label"
+        style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, cursor: "pointer" }}
+      >
+        <input
+          type="checkbox"
+          checked={lead}
+          onChange={(e) => {
+            setLead(e.target.checked);
+            setMsg(null);
+          }}
+        />
+        Cloud Lead — sees the whole QC team, keeps logging visits
+      </label>
+
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
         <button
           type="button"
           className="btn btn-secondary btn-small"
           style={{ width: "auto" }}
-          disabled={pending || (!nnDirty && !subDirty)}
+          disabled={pending || (!nnDirty && !subDirty && !leadDirty)}
           onClick={save}
         >
           {pending ? "Saving…" : "Save roles"}

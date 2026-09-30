@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { RoleType } from "@prisma/client";
+
 import { db } from "@/lib/db";
 import {
   EMPTY_SCOPE,
@@ -8,11 +10,23 @@ import {
   type ViewScope,
 } from "@/lib/role-scope";
 
-/** Prisma `where` fragment for "a plain QC member" — nobody holding a
- *  coordinator-side seat. Those accounts are view-only, so they're left out
- *  of the roster, the leaderboard, rotation, digests and the co-visitor
- *  picker exactly as the old `role != COORDINATOR` filter did. */
-export const QC_MEMBER_WHERE = { roleAssignments: { none: {} } } as const;
+/** Prisma `where` fragment for "someone who does QC work" — everyone except
+ *  the view-only seats, who are left out of the roster, the leaderboard,
+ *  rotation, digests and the co-visitor picker.
+ *
+ *  Checks the seat *types* rather than "holds any seat", because a Cloud
+ *  Lead holds one and is still very much a QC member: a blanket `none: {}`
+ *  would quietly drop them off the team page and out of everyone's
+ *  co-visitor list the moment they were made a lead. */
+export const QC_MEMBER_WHERE = {
+  roleAssignments: {
+    none: {
+      roleType: {
+        in: ["COORDINATOR", "SR_COORDINATOR", "CORE_TEAM"] as RoleType[],
+      },
+    },
+  },
+};
 
 /**
  * What this user can see, resolved from their role assignments (plus anyone

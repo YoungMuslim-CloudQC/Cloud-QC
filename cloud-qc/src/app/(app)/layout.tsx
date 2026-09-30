@@ -63,6 +63,7 @@ export default async function AppLayout({
         <SidebarNav
           isAdmin={isAdmin}
           isCoordinator={isCoordinator}
+          isLead={user.scope.cloudLead}
           pendingCount={pendingCount}
         />
 
@@ -74,7 +75,7 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      <MobileNav isAdmin={isAdmin} isCoordinator={isCoordinator} />
+      <MobileNav isAdmin={isAdmin} isCoordinator={isCoordinator} isLead={user.scope.cloudLead} />
 
       <main className="main">{children}</main>
 
