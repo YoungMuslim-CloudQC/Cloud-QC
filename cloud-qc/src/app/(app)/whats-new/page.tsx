@@ -1,6 +1,6 @@
 import { requireApprovedAny } from "@/lib/authz";
 import { CHANGELOG } from "@/lib/changelog";
-import { markChangelogRead } from "@/server/actions/changelog";
+import { markCaughtUp } from "@/lib/changelog-read";
 import { PageHead } from "@/components/PageHead";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 /** Every release note, newest first. Opening the page counts as reading
  *  them, so the banner doesn't reappear afterwards. */
 export default async function WhatsNewPage() {
-  await requireApprovedAny();
-  await markChangelogRead();
+  const me = await requireApprovedAny();
+  // Opening the page counts as reading them, so the banner stays gone.
+  if (!me.impersonating) await markCaughtUp(me.id);
 
   return (
     <>

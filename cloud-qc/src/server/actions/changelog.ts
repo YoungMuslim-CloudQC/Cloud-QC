@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { assertApprovedAny, getSessionUser } from "@/lib/authz";
+import { getSessionUser } from "@/lib/authz";
 import { CHANGELOG } from "@/lib/changelog";
 import { db } from "@/lib/db";
 
@@ -30,12 +30,3 @@ export async function dismissWhatsNew(releaseId: string) {
   return { ok: true as const };
 }
 
-/** Called from /whats-new so opening the page counts as reading it. */
-export async function markChangelogRead() {
-  const me = await assertApprovedAny();
-  await db.user.update({
-    where: { id: me.id },
-    data: { lastSeenChangelog: CHANGELOG[0]?.id ?? null },
-  });
-  revalidatePath("/", "layout");
-}

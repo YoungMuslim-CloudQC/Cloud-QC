@@ -34,6 +34,10 @@ export type DigestContent = {
   noRegionSelected: boolean;
   /** The subAreas this digest actually covers (for the email's own byline). */
   subAreas: string[];
+  /** Who it's for. A QC member's "your activity" line counts visits they
+   *  went on; a coordinator never goes on any, so theirs counts what was
+   *  logged *about* their neighbornets instead. Same layout either way. */
+  audience?: "member" | "coordinator";
 };
 
 /** Is this user due for a digest right now, given their cadence and the
@@ -178,6 +182,7 @@ export function digestEmailHtml(
 ): { subject: string; html: string } {
   const { attention, onTrackNames, notVisitedNames, yourVisitCount, periodLabel, noRegionSelected, subAreas } =
     content;
+  const forCoordinator = content.audience === "coordinator";
 
   if (noRegionSelected) {
     const subject = "Cloud QC Digest — set your region to get started";
@@ -248,9 +253,18 @@ export function digestEmailHtml(
       <div style="color:#ede9fe;font-size:14px;margin-bottom:4px;">
         Hi ${escapeHtml(opts.firstName)}, here's your ${periodLabel.toLowerCase()} neighbornet summary.
       </div>
-      <div style="color:#948CBB;font-size:12px;margin-bottom:20px;">
+      <div style="color:#948CBB;font-size:12px;margin-bottom:${forCoordinator ? "14" : "20"}px;">
         Covering: ${escapeHtml(subAreas.join(", "))}
       </div>
+      ${
+        forCoordinator
+          ? `<div style="background:#1f1742;border-left:3px solid #7c3aed;border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:20px;color:#c4b5fd;font-size:12px;line-height:1.6;">
+        <strong style="color:#ede9fe;">This arrives weekly, but always covers the full trimester.</strong>
+        Nothing drops off between emails — you're seeing the whole term every time, so
+        the same neighbornet will keep appearing until its status actually changes.
+      </div>`
+          : ""
+      }
 
       <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#fbbf24;margin-bottom:6px;">
         Needs attention (${attention.length})
@@ -268,13 +282,17 @@ export function digestEmailHtml(
       ${notVisitedHtml}
 
       <div style="font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#38bdf8;margin:20px 0 6px 0;">
-        Your activity — ${periodLabel.toLowerCase()}
+        ${forCoordinator ? "Activity" : "Your activity"} — ${periodLabel.toLowerCase()}
       </div>
       <div style="color:#ede9fe;font-size:13px;">
-        You submitted or co-visited ${yourVisitCount} visit${yourVisitCount === 1 ? "" : "s"}.
+        ${
+          forCoordinator
+            ? `QC logged ${yourVisitCount} visit${yourVisitCount === 1 ? "" : "s"} about your neighbornet${subAreas.length === 1 ? "" : "s"}.`
+            : `You submitted or co-visited ${yourVisitCount} visit${yourVisitCount === 1 ? "" : "s"}.`
+        }
       </div>
 
-      <a href="${opts.appUrl}/dashboard"
+      <a href="${opts.appUrl}${forCoordinator ? "/coordinator" : "/dashboard"}"
          style="display:inline-block;margin-top:24px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:7px;">
         Open Cloud QC dashboard
       </a>

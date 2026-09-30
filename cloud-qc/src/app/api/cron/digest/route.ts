@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { buildDigestContent, digestEmailHtml, isDigestDue } from "@/lib/digest";
+import { buildCoordinatorDigestContent } from "@/lib/coordinator-digest";
 import { sendDigestEmail } from "@/lib/resend";
 import { memberName } from "@/lib/queries";
 
@@ -80,8 +81,59 @@ export async function GET(req: Request) {
     }
   }
 
+  // --- Coordinator-side accounts ---
+  // A separate pass because QC_MEMBER_WHERE above deliberately excludes
+  // them, and their content is built differently: scoped by their role
+  // assignments rather than the profile sub-area fields they never set,
+  // and always covering a trimester however often it's sent.
+  const coordinators = await db.user.findMany({
+    where: {
+      status: "APPROVED",
+      digestCadence: { not: "OFF" },
+      roleAssignments: {
+        some: { roleType: { in: ["COORDINATOR", "SR_COORDINATOR", "CORE_TEAM"] } },
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      digestCadence: true,
+      lastDigestSentAt: true,
+    },
+  });
+
+  for (const u of coordinators) {
+    if (u.digestCadence === "OFF") continue;
+    if (!isDigestDue(u.digestCadence, u.lastDigestSentAt, now)) continue;
+
+    try {
+      const content = await buildCoordinatorDigestContent(u.id);
+      const { subject, html } = digestEmailHtml(content, {
+        firstName: memberName(u).split(" ")[0] ?? "there",
+        appUrl,
+      });
+      const sent = await sendDigestEmail({ to: u.email, subject, html });
+      if (sent.ok) {
+        await db.user.update({
+          where: { id: u.id },
+          data: { lastDigestSentAt: now },
+        });
+        results.push({ userId: u.id, email: u.email, outcome: "sent" });
+      } else {
+        results.push({ userId: u.id, email: u.email, outcome: `failed: ${sent.error}` });
+      }
+    } catch (err) {
+      results.push({
+        userId: u.id,
+        email: u.email,
+        outcome: `error: ${err instanceof Error ? err.message : "unknown"}`,
+      });
+    }
+  }
+
   return NextResponse.json({
-    checked: candidates.length,
+    checked: candidates.length + coordinators.length,
     due: results.length,
     sent: results.filter((r) => r.outcome === "sent").length,
     results,
