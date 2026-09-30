@@ -1845,6 +1845,157 @@ tr:last-child td {
    sub-region checkboxes (closed by default — there are ~30 of them). */
 /* Row under the dashboard's neighbornet grid: the ways out of the short
    list (more in this area / show all / browse). */
+/* ================= COORDINATOR ================= */
+/* The inbox earns the full window: these are long read-once cards, and at
+   1180px it was one narrow column with the rest of the screen empty. Keyed
+   off the masonry itself so the page opts in just by using it, rather than
+   the shared layout having to know which routes are wide. */
+.main:has(.feed-masonry) {
+  max-width: none;
+}
+
+/* Pinterest-style masonry. CSS columns rather than grid, because the cards
+   are wildly different heights — one visit is two lines, the next is six
+   paragraphs — and columns flow them without leaving gaps. */
+.feed-masonry {
+  column-width: 340px;
+  column-gap: 16px;
+}
+.feed-masonry > * {
+  break-inside: avoid;
+  page-break-inside: avoid; /* Safari wants both */
+  margin: 0 0 16px;
+  display: inline-block;
+  width: 100%;
+}
+
+.co-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.co-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.co-stat-label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.co-stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.co-stat-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+/* The unreviewed tile is the one that wants acting on, so it's the only
+   one that gets the accent. */
+.co-stat.attention {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+.co-stat.attention .co-stat-value {
+  color: var(--accent);
+}
+
+.co-nn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+}
+.co-nn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.co-nn-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.co-nn-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.co-nn-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  font-size: 12.5px;
+  margin: 0;
+}
+.co-nn-rows dt {
+  color: var(--text-muted);
+}
+.co-nn-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Marks a card in the inbox this person hasn't ticked off yet. */
+.unread-rail {
+  border-left: 3px solid var(--accent);
+}
+
+/* ================= VIEW AS ================= */
+/* Fixed, full-bleed and in the warning colour — an admin who forgets which
+   account they're looking at is the main way this feature goes wrong, so
+   it can't be scrolled past. */
+.view-as-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--warn);
+}
+.view-as-note {
+  opacity: 0.85;
+}
+.view-as-stop {
+  background: var(--warn);
+  color: #1a1206;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* Push the app down so the bar never sits over the sidebar or content. */
+.app.has-view-as .sidebar,
+.app.has-view-as .main {
+  padding-top: 52px;
+}
+
+
 .nn-board-more {
   display: flex;
   flex-wrap: wrap;
@@ -2593,4 +2744,244 @@ tr:last-child td {
 .sf-item-meta code {
   font-family: var(--font-mono), monospace;
   word-break: break-all;
+}
+
+/* ================= ORG MAP ================= */
+/* A reporting tree, not a list of cards: the connector lines and the
+   indent are what say who answers to whom, so they carry meaning rather
+   than decoration. */
+.orgc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.orgc-search {
+  max-width: 380px;
+}
+.orgc-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.orgc-branch {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px 20px;
+  margin-bottom: 14px;
+}
+.orgc-branch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.orgc-branch-head h2 {
+  font-size: 15px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.orgc-branch-head span {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.orgc-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 232px;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.orgc-card:hover {
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+.orgc-card.sel {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+.orgc-card.compact {
+  width: 210px;
+  padding: 9px 11px;
+}
+.orgc-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.orgc-card-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orgc-card-title {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Small amber dot: this account hasn't been approved yet. */
+.orgc-pending {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.orgc-lead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* The vertical connector. */
+.orgc-stem {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+}
+.orgc-stem.short {
+  height: 12px;
+}
+.orgc-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+}
+.orgc-row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+/* The horizontal rail joining siblings back up to their lead. */
+.orgc-row.railed::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 116px;
+  right: 116px;
+  height: 1px;
+  background: var(--border);
+}
+.orgc-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+.orgc-row.under > .orgc-col::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  width: 1px;
+  height: 10px;
+  background: var(--border);
+}
+.orgc-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+.orgc-gaps {
+  margin-top: 16px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ---- profile panel ---- */
+.orgc-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 70;
+}
+.orgc-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 92vw);
+  z-index: 71;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  padding: 24px 22px;
+  overflow-y: auto;
+}
+.orgc-panel-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.orgc-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.orgc-panel-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+.orgc-panel-title {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.orgc-panel-section {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 18px 0 7px;
+}
+.orgc-panel-link {
+  font-size: 13px;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.orgc-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  margin: 0;
+}
+.orgc-facts dt {
+  color: var(--text-muted);
+}
+.orgc-facts dd {
+  margin: 0;
+}
+.orgc-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.orgc-report {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
 }

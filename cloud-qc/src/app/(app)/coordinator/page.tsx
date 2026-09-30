@@ -1,190 +1,154 @@
 import Link from "next/link";
 
-import { db } from "@/lib/db";
-import { requireCoordinator } from "@/lib/authz";
-import { memberName } from "@/lib/queries";
+import { requireViewRole } from "@/lib/authz";
+import { getCoordinatorStats } from "@/lib/coordinator-stats";
 import { isoDate, statusMeta } from "@/lib/format";
-import { EVENT_TYPE_LABEL } from "@/lib/visit-schema";
 import { PageHead } from "@/components/PageHead";
 
 export const dynamic = "force-dynamic";
 
-const INBOX_LIMIT = 100;
-
 function rating(n: number | null) {
-  return n == null ? "—" : `${n}/5`;
+  return n == null ? "—" : n.toFixed(1);
 }
 
-/** Read-only inbox of everything QC members have logged about the
- *  neighbornet(s) this coordinator runs. */
-export default async function CoordinatorInboxPage({
-  searchParams,
-}: PageProps<"/coordinator">) {
-  const user = await requireCoordinator();
-  const { nn: nnParam } = await searchParams;
+function daysAgo(d: Date | null): string {
+  if (!d) return "never";
+  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.round(days / 30);
+  return months === 1 ? "a month ago" : `${months} months ago`;
+}
 
-  const assignments = await db.neighbornetCoordinator.findMany({
-    where: { userId: user.id, neighbornet: { archivedAt: null } },
-    orderBy: { neighbornet: { name: "asc" } },
-    select: { neighbornet: { select: { id: true, name: true, subArea: true } } },
-  });
-  const myNns = assignments.map((a) => a.neighbornet);
+/** The coordinator's home: how their neighbornet is doing at a glance, and
+ *  what's waiting on them. Identical for an SR coordinator — the only
+ *  difference is how many neighbornets it covers. */
+export default async function CoordinatorDashboard() {
+  const user = await requireViewRole();
+  const { nns, totals } = await getCoordinatorStats(user.id, user.scope);
 
-  if (myNns.length === 0) {
+  if (nns.length === 0) {
     return (
       <>
-        <PageHead title="Feedback inbox" desc="Feedback about your neighbornet." />
+        <PageHead title="Your neighbornet" desc="How things are going." />
         <div className="card" style={{ maxWidth: 640 }}>
           <div className="empty-state">
-            <strong>No neighbornet linked yet</strong>
-            An admin needs to link your account to the neighbornet you
-            coordinate before feedback shows up here.
+            <strong>Nothing linked yet</strong>
+            An admin needs to link your account to the neighbornet or
+            sub-region you look after before anything shows up here.
           </div>
         </div>
       </>
     );
   }
 
-  const selected =
-    typeof nnParam === "string" && myNns.some((n) => n.id === nnParam)
-      ? nnParam
-      : "";
-
-  const visits = await db.visit.findMany({
-    where: {
-      deletedAt: null,
-      // The credit-bearing link — a joint event touching this coordinator's
-      // NN still shows up here; a Bash/SR event never has one, so it can't.
-      neighbornets: {
-        some: { neighbornetId: selected ? selected : { in: myNns.map((n) => n.id) } },
-      },
-    },
-    orderBy: [{ visitDate: "desc" }, { createdAt: "desc" }],
-    take: INBOX_LIMIT,
-    include: {
-      neighbornets: { include: { neighbornet: { select: { id: true, name: true } } } },
-      submittedBy: { select: { name: true, email: true } },
-      participants: {
-        where: { role: "CO_VISITOR" },
-        include: { user: { select: { name: true, email: true } } },
-      },
-      comments: {
-        orderBy: { createdAt: "asc" },
-        include: { author: { select: { name: true, email: true } } },
-      },
-    },
-  });
+  const single = nns.length === 1 ? nns[0] : null;
 
   return (
     <>
       <PageHead
-        title="Feedback inbox"
+        title={single ? single.name : "Your sub-region"}
         desc={
-          myNns.length === 1
-            ? `Everything QC has logged about ${myNns[0].name}.`
-            : "Everything QC has logged about your neighbornets."
+          single
+            ? "How QC says it's going, and what's waiting on you."
+            : `How QC says your ${nns.length} neighbornets are going.`
         }
       />
 
-      {myNns.length > 1 && (
-        <div className="status-options" style={{ marginBottom: 16, maxWidth: 640 }}>
-          <Link
-            href="/coordinator"
-            className={`status-opt${selected === "" ? " sel-ok" : ""}`}
-            style={{ textDecoration: "none" }}
-          >
-            All
-          </Link>
-          {myNns.map((n) => (
-            <Link
-              key={n.id}
-              href={`/coordinator?nn=${n.id}`}
-              className={`status-opt${selected === n.id ? " sel-ok" : ""}`}
-              style={{ textDecoration: "none" }}
-            >
-              {n.name}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {visits.length === 0 ? (
-        <div className="card" style={{ maxWidth: 640 }}>
-          <div className="empty-state">
-            <strong>No feedback yet</strong>
-            When a QC member logs a visit to your neighbornet, it will show up
-            here.
+      <div className="co-stat-grid">
+        <div className={`co-stat${totals.unreviewed > 0 ? " attention" : ""}`}>
+          <div className="co-stat-label">To review</div>
+          <div className="co-stat-value">{totals.unreviewed}</div>
+          <div className="co-stat-sub">
+            {totals.unreviewed === 0
+              ? "You're all caught up"
+              : `of ${totals.visitCount} visits logged`}
           </div>
         </div>
-      ) : (
-        visits.map((v) => {
-          const meta = statusMeta(v.status);
-          const coVisitors = v.participants.map((p) => memberName(p.user));
-          const by = coVisitors.length
-            ? `${memberName(v.submittedBy)} + ${coVisitors.join(", ")}`
-            : memberName(v.submittedBy);
+        <div className="co-stat">
+          <div className="co-stat-label">Last QC visit</div>
+          <div className="co-stat-value" style={{ fontSize: 19 }}>
+            {daysAgo(totals.lastVisitDate)}
+          </div>
+          <div className="co-stat-sub">
+            {totals.lastVisitDate ? isoDate(totals.lastVisitDate) : "no visits yet"}
+          </div>
+        </div>
+        <div className="co-stat">
+          <div className="co-stat-label">Needs follow-up</div>
+          <div className="co-stat-value">{totals.needsFollowup}</div>
+          <div className="co-stat-sub">visits flagged by QC</div>
+        </div>
+        <div className="co-stat">
+          <div className="co-stat-label">Visits logged</div>
+          <div className="co-stat-value">{totals.visitCount}</div>
+          <div className="co-stat-sub">all time</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
+        <Link className="btn btn-primary" href="/coordinator/inbox" style={{ width: "auto" }}>
+          {totals.unreviewed > 0
+            ? `Read ${totals.unreviewed} new ${totals.unreviewed === 1 ? "note" : "notes"}`
+            : "Open the feedback inbox"}
+        </Link>
+        <Link className="btn btn-secondary" href="/coordinator/team">
+          Your core team
+        </Link>
+        {user.scope.nationalRollup && (
+          <Link className="btn btn-secondary" href="/coordinator/national">
+            National rollup
+          </Link>
+        )}
+      </div>
+
+      <div className="section-label">
+        <span>{single ? "Ratings" : "Each neighbornet"}</span>
+      </div>
+      <div className="co-nn-grid">
+        {nns.map((n) => {
+          const meta = statusMeta(n.status);
           return (
-            <div className="card" key={v.id} style={{ maxWidth: 640, marginBottom: 14 }}>
-              <div className="section-label">
-                <span>
-                  {v.neighbornets.map((l) => l.neighbornet.name).join(", ")} &middot;{" "}
-                  {isoDate(v.visitDate)}
-                </span>
-                <span style={{ display: "flex", gap: 6 }}>
-                  {v.eventType !== "VISIT" && (
-                    <span className="badge badge-event">
-                      {EVENT_TYPE_LABEL[v.eventType]}
-                    </span>
+            <div className="co-nn" key={n.id}>
+              <div className="co-nn-top">
+                <span className="co-nn-name">{n.name}</span>
+                {n.visitCount === 0 ? (
+                  <span className="badge badge-neutral">No visits yet</span>
+                ) : (
+                  <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                )}
+              </div>
+              <dl className="co-nn-rows">
+                <dt>Food</dt>
+                <dd>{rating(n.food)}</dd>
+                <dt>Leadership</dt>
+                <dd>{rating(n.leadership)}</dd>
+                <dt>Halaqah</dt>
+                <dd>{rating(n.halaqah)}</dd>
+                <dt>Last visit</dt>
+                <dd>
+                  {n.lastVisitDate ? isoDate(n.lastVisitDate) : "—"}
+                  {n.lastVisitBy && (
+                    <span style={{ color: "var(--text-muted)" }}> · {n.lastVisitBy}</span>
                   )}
-                  {v.status && <span className={`badge ${meta.cls}`}>{meta.label}</span>}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto 1fr",
-                  gap: "4px 14px",
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ color: "var(--text-muted)" }}>Visited by</div>
-                <div>{by}</div>
-                <div style={{ color: "var(--text-muted)" }}>Group size</div>
-                <div>{v.groupSize ?? "—"}</div>
-                <div style={{ color: "var(--text-muted)" }}>Average age</div>
-                <div>{v.avgAge ?? "—"}</div>
-                <div style={{ color: "var(--text-muted)" }}>Food</div>
-                <div>{rating(v.foodRating)}</div>
-                <div style={{ color: "var(--text-muted)" }}>Leadership</div>
-                <div>{rating(v.leadershipRating)}</div>
-                <div style={{ color: "var(--text-muted)" }}>Halaqah</div>
-                <div>{rating(v.halaqahRating)}</div>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 12,
-                  whiteSpace: "pre-wrap",
-                  fontSize: 13,
-                  borderLeft: "2px solid var(--border)",
-                  paddingLeft: 10,
-                }}
-              >
-                {v.notes}
-                {v.comments.map((c) => (
-                  <div key={c.id} style={{ marginTop: 6, color: "var(--text-muted)" }}>
-                    — {memberName(c.author)}: {c.body}
-                  </div>
-                ))}
-              </div>
+                </dd>
+                <dt>Follow-ups</dt>
+                <dd>{n.needsFollowup}</dd>
+              </dl>
+              {n.unreviewed > 0 && (
+                <Link
+                  className="btn btn-secondary btn-small"
+                  href={`/coordinator/inbox?nn=${n.id}`}
+                  style={{ width: "auto" }}
+                >
+                  {n.unreviewed} to review →
+                </Link>
+              )}
             </div>
           );
-        })
-      )}
-      {visits.length === INBOX_LIMIT && (
-        <div className="survey-time-note">Showing the latest {INBOX_LIMIT}.</div>
-      )}
+        })}
+      </div>
     </>
   );
 }

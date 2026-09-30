@@ -42,9 +42,13 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
             neighbornet: {
               select: {
                 name: true,
-                coordinators: {
+                // Everyone holding a seat scoped to this NN. During a
+                // succession window that's both coordinators, which is
+                // intended — they both answer for it until the handoff ends.
+                roleAssignments: {
+                  where: { roleType: "COORDINATOR" },
                   select: {
-                    user: { select: { email: true, name: true, role: true, status: true } },
+                    user: { select: { email: true, name: true, status: true } },
                   },
                 },
               },
@@ -63,8 +67,8 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
     // coordinates two of the tagged neighbornets.
     const nnNamesByEmail = new Map<string, { user: { name: string | null; email: string }; nnNames: string[] }>();
     for (const link of visit.neighbornets) {
-      for (const c of link.neighbornet.coordinators) {
-        if (c.user.role !== "COORDINATOR" || c.user.status !== "APPROVED") continue;
+      for (const c of link.neighbornet.roleAssignments) {
+        if (c.user.status !== "APPROVED") continue;
         const entry = nnNamesByEmail.get(c.user.email) ?? { user: c.user, nnNames: [] };
         entry.nnNames.push(link.neighbornet.name);
         nnNamesByEmail.set(c.user.email, entry);

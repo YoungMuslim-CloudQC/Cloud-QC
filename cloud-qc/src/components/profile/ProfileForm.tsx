@@ -13,13 +13,17 @@ import { flattenRegionMap, parseArea, subValue } from "@/lib/sub-regions";
 
 const INITIAL: ProfileState = {};
 
-type Cadence = "OFF" | "WEEKLY" | "BIWEEKLY" | "MONTHLY";
+type Cadence = "OFF" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "TRIMESTER";
 type Channel = "EMAIL" | "SMS" | "BOTH";
 
-const CADENCE_LABEL: Record<"WEEKLY" | "BIWEEKLY" | "MONTHLY", string> = {
+const CADENCE_LABEL: Record<
+  "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "TRIMESTER",
+  string
+> = {
   WEEKLY: "every week",
   BIWEEKLY: "every two weeks",
   MONTHLY: "every month",
+  TRIMESTER: "every three months",
 };
 
 /** `isNewSelection`: true when this cadence differs from what's already
@@ -58,6 +62,7 @@ export function ProfileForm({
   regionMap,
   representingNeighbornetId,
   neighbornetOptions,
+  alertOnNewFeedback = true,
   isCoordinator = false,
 }: {
   name: string;
@@ -73,7 +78,8 @@ export function ProfileForm({
   regionMap: RegionMap;
   representingNeighbornetId: string | null;
   neighbornetOptions: NeighbornetOption[];
-  /** Coordinators only manage photo/phone/theme — no QC digest or leaderboard. */
+  alertOnNewFeedback?: boolean;
+  /** Coordinators get their own neighbornet emails instead of the QC digest. */
   isCoordinator?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(updateProfile, INITIAL);
@@ -337,6 +343,7 @@ export function ProfileForm({
                 ["WEEKLY", "Weekly"],
                 ["BIWEEKLY", "Biweekly"],
                 ["MONTHLY", "Monthly"],
+                ["TRIMESTER", "Every 3 months"],
               ] as const
             ).map(([value, label]) => (
               <label
@@ -380,6 +387,63 @@ export function ProfileForm({
       </div>
 
       </>
+      )}
+
+      {/* Coordinators get their own two emails rather than the QC digest:
+          a periodic summary of their own neighbornet, and an alert the
+          moment new feedback lands. No area picker — their scope is
+          already whatever they look after. */}
+      {isCoordinator && (
+        <div className="field">
+          <label>Emails about your neighbornet</label>
+          <div className="subpanel">
+            <div className="status-options">
+              {(
+                [
+                  ["OFF", "Off"],
+                  ["MONTHLY", "Monthly"],
+                  ["TRIMESTER", "Every 3 months"],
+                ] as const
+              ).map(([value, label]) => (
+                <label
+                  key={value}
+                  className={`status-opt${cadence === value ? " sel-ok" : ""}`}
+                  style={{ cursor: "pointer" }}
+                >
+                  <input
+                    type="radio"
+                    name="digestCadence"
+                    value={value}
+                    checked={cadence === value}
+                    onChange={() => setCadence(value)}
+                    style={{ display: "none" }}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="survey-time-note" style={{ marginTop: 10, marginBottom: 14 }}>
+              {cadence === "OFF"
+                ? "No summary emails."
+                : `A summary of every visit logged for your neighbornet, ${CADENCE_LABEL[cadence]}.`}
+            </div>
+
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                name="alertOnNewFeedback"
+                defaultChecked={alertOnNewFeedback}
+              />
+              Email me as soon as new feedback lands
+            </label>
+            <div className="survey-time-note" style={{ marginTop: 8 }}>
+              Separate from the summary above — one email per visit, as it
+              happens. Texts aren&rsquo;t wired up yet, so these go by email.
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="field">

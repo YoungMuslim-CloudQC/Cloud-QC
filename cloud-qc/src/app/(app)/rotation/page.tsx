@@ -1,3 +1,4 @@
+import { QC_MEMBER_WHERE } from "@/lib/role-access";
 import { requireApproved } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { memberName } from "@/lib/queries";
@@ -29,7 +30,7 @@ export default async function RotationPage() {
       },
     }),
     db.user.findMany({
-      where: { status: "APPROVED", role: { not: "COORDINATOR" } },
+      where: { status: "APPROVED", ...QC_MEMBER_WHERE },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true },
     }),

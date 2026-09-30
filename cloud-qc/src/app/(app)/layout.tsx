@@ -10,6 +10,7 @@ import { Avatar } from "@/components/Avatar";
 import { SidebarNav, MobileNav } from "@/components/AppNav";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SiteFeedbackWidget } from "@/components/site-feedback/SiteFeedbackWidget";
+import { ViewAsBanner } from "@/components/ViewAsBanner";
 
 export default async function AppLayout({
   children,
@@ -18,7 +19,7 @@ export default async function AppLayout({
 }) {
   const user = await requireApprovedAny();
   const isAdmin = user.role === "ADMIN";
-  const isCoordinator = user.role === "COORDINATOR";
+  const isCoordinator = user.scope.viewOnly && user.role !== "ADMIN";
   const pendingCount = isAdmin
     ? await db.user.count({ where: { status: "PENDING" } })
     : 0;
@@ -26,7 +27,8 @@ export default async function AppLayout({
   const displayName = user.name || user.email || "Member";
 
   return (
-    <div className="app">
+    <div className={`app${user.impersonating ? " has-view-as" : ""}`}>
+      {user.impersonating && <ViewAsBanner impersonating={user.impersonating} />}
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">

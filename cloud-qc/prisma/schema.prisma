@@ -15,14 +15,40 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
+// The account-level role. Deliberately only these two: the coordinator-side
+// roles are *assignments* (a person can hold several, each with its own
+// scope), so they live in UserRoleAssignment rather than here. See RoleType.
 enum Role {
   MEMBER
   ADMIN
-  // Runs a neighbornet rather than QC-ing them: signs in to a read-only inbox
-  // of the feedback logged about the neighbornet(s) linked in
-  // NeighbornetCoordinator. Blocked from every QC-member screen and action
-  // (feedback, rotation, leaderboard, digests); still shares profile and
-  // site feedback with everyone else.
+  /// DEPRECATED — superseded by UserRoleAssignment. Nothing in this codebase
+  /// reads or writes it any more, but the value stays until the release that
+  /// removes it has shipped: the currently deployed build still filters on
+  /// `role != COORDINATOR`, and dropping the label out from under it took
+  /// /feedback and /team down once already. Drop it in a follow-up migration
+  /// once this branch is live.
+  COORDINATOR
+}
+
+// The coordinator-side roles. All three are view-only: holding any of them
+// means the account can read feedback but never submit, edit or send it.
+enum RoleType {
+  // Runs one neighbornet. Full detail on that NN, nothing outside it.
+  COORDINATOR
+  // Runs a sub-region. Full detail on every NN inside it, plus a national
+  // rollup (status + averaged ratings, never the written feedback) of every
+  // NN elsewhere.
+  SR_COORDINATOR
+  // On a coordinator's or SRC's core team: sees exactly what the person who
+  // invited them sees, no more. Resolved by walking inheritsFromUserId.
+  CORE_TEAM
+}
+
+// What someone asked to be at signup. A request the admin rules on during
+// the existing PENDING -> APPROVED review, never a grant in itself.
+// SR_COORDINATOR is deliberately absent: admin-assigned only, after the fact.
+enum RequestedRole {
+  MEMBER
   COORDINATOR
 }
 
@@ -82,6 +108,9 @@ enum DigestCadence {
   WEEKLY
   BIWEEKLY
   MONTHLY
+  // Every three months — the cadence coordinators asked for, so a neighbornet
+  // gets one "here's the term you just had" summary rather than a drip.
+  TRIMESTER
 }
 
 enum NotificationChannel {
@@ -133,7 +162,22 @@ model User {
   representingNeighbornetId String?
   representingNeighbornet   Neighbornet? @relation("UserRepresents", fields: [representingNeighbornetId], references: [id], onDelete: SetNull)
 
-  coordinates NeighbornetCoordinator[]
+  // What they asked to be at signup, and (for a coordinator request) which
+  // neighbornet they claimed. Both are hints for the admin reviewing their
+  // PENDING account — the real grant is a UserRoleAssignment.
+  requestedRole          RequestedRole?
+  requestedNeighbornetId String?
+
+  // Email me as soon as QC logs feedback about a neighbornet I look after,
+  // separately from the periodic digest above. Only ever consulted for
+  // someone holding a coordinator-side seat.
+  alertOnNewFeedback Boolean @default(true)
+
+  roleAssignments        UserRoleAssignment[]     @relation("RoleAssignmentUser")
+  coreTeamOf             UserRoleAssignment[]     @relation("RoleAssignmentInheritsFrom")
+  roleAssignmentsGranted UserRoleAssignment[]     @relation("RoleAssignmentGrantedBy")
+  visitReviews           CoordinatorVisitReview[]
+  legacyCoordinates      NeighbornetCoordinator[]
 
   accounts             Account[]
   sessions             Session[]
@@ -238,19 +282,69 @@ model Neighbornet {
   archivedById String?
   archivedBy   User?   @relation("NeighbornetArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
 
-  visits        Visit[] // legacy single-NN pointer — see Visit.neighbornetId
-  visitLinks    VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
-  rotations     RotationAssignment[]
-  representedBy User[]                   @relation("UserRepresents")
-  coordinators  NeighbornetCoordinator[]
+  visits             Visit[] // legacy single-NN pointer — see Visit.neighbornetId
+  visitLinks         VisitNeighbornet[] // the real, credit-bearing visit <-> NN link
+  rotations          RotationAssignment[]
+  representedBy      User[]                   @relation("UserRepresents")
+  roleAssignments    UserRoleAssignment[]
+  legacyCoordinators NeighbornetCoordinator[]
 
   @@index([stateCode])
   @@index([region, subArea])
   @@index([archivedAt])
 }
 
-// Which neighbornet(s) a COORDINATOR user runs. Set by an admin, or claimed at
-// signup (and confirmed when the admin approves the account).
+// One held coordinator-side role. A person can hold several rows here (a
+// core-team seat and a coordinator seat, say), which is why this isn't a
+// field on User. Exactly one scope column is set per row, decided by
+// roleType — see RoleType for which.
+model UserRoleAssignment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roleType RoleType
+
+  userId String
+  user   User   @relation("RoleAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  // COORDINATOR: the one neighbornet they run. A person holds at most one
+  // COORDINATOR row (enforced in code, not by a constraint, because the
+  // succession window deliberately puts *two people* on one neighbornet).
+  scopeNeighbornetId String?
+  scopeNeighbornet   Neighbornet? @relation(fields: [scopeNeighbornetId], references: [id], onDelete: Cascade)
+
+  // SR_COORDINATOR: the sub-region they run. Same string vocabulary as
+  // Neighbornet.subArea — not a foreign key, exactly like Visit.subRegion.
+  scopeSubregion String?
+
+  // CORE_TEAM: whose visibility this seat borrows. Resolved by walking up
+  // until a non-CORE_TEAM assignment is found, so a chain still lands on a
+  // real scope (and so an outgoing coordinator's core team keeps working
+  // after the handoff re-seats them under the new coordinator).
+  inheritsFromUserId String?
+  inheritsFrom       User?   @relation("RoleAssignmentInheritsFrom", fields: [inheritsFromUserId], references: [id], onDelete: Cascade)
+
+  // Set on the OUTGOING coordinator's row when a handoff starts: both hold
+  // the neighbornet until this passes, then the nightly cron retires this
+  // row and re-seats them on the new coordinator's core team.
+  transitionEndsAt DateTime?
+
+  grantedById String?
+  grantedBy   User?   @relation("RoleAssignmentGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([roleType])
+  @@index([scopeNeighbornetId])
+  @@index([scopeSubregion])
+  @@index([inheritsFromUserId])
+  @@index([transitionEndsAt])
+}
+
+/// DEPRECATED — superseded by UserRoleAssignment (roleType COORDINATOR).
+/// Unused by this codebase and always empty; kept only so the schema matches
+/// the database the currently deployed build still queries. Dropped in a
+/// follow-up migration once this branch has shipped.
 model NeighbornetCoordinator {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -263,6 +357,24 @@ model NeighbornetCoordinator {
 
   @@unique([userId, neighbornetId])
   @@index([neighbornetId])
+}
+
+// "I've read this one." Per person rather than per neighbornet: a
+// coordinator and each of their core team work through the inbox on their
+// own, so one of them clearing a visit must not clear it for the others.
+model CoordinatorVisitReview {
+  id         String   @id @default(cuid())
+  reviewedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  visitId String
+  visit   Visit  @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, visitId])
+  @@index([userId])
+  @@index([visitId])
 }
 
 // Feedback about the Cloud QC site itself, left from any page: the person
@@ -345,11 +457,12 @@ model Visit {
   submittedById String
   submittedBy   User   @relation("VisitSubmittedBy", fields: [submittedById], references: [id])
 
-  participants  VisitParticipant[]
-  comments      VisitComment[]
-  history       VisitHistory[]
-  disputes      VisitDispute[]     @relation("DisputedVisit")
-  ownedDisputes VisitDispute[]     @relation("DisputeOwnVisit")
+  participants       VisitParticipant[]
+  comments           VisitComment[]
+  history            VisitHistory[]
+  disputes           VisitDispute[]           @relation("DisputedVisit")
+  ownedDisputes      VisitDispute[]           @relation("DisputeOwnVisit")
+  coordinatorReviews CoordinatorVisitReview[]
 
   @@index([neighbornetId, visitDate])
   @@index([submittedById])

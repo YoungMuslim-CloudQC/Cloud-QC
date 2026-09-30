@@ -15,7 +15,10 @@ type NavKey =
   | "rotation"
   | "profile"
   | "admin"
-  | "inbox";
+  | "inbox"
+  | "coHome"
+  | "coreTeam"
+  | "org";
 
 type NavDef = {
   key: NavKey;
@@ -31,8 +34,36 @@ type NavDef = {
 
 const NAV: NavDef[] = [
   {
-    key: "inbox",
+    key: "coHome",
     href: "/coordinator",
+    label: "Your neighbornet",
+    short: "Home",
+    coordinatorOnly: true,
+    primaryMobile: true,
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "coreTeam",
+    href: "/coordinator/team",
+    label: "Core team",
+    short: "Team",
+    coordinatorOnly: true,
+    primaryMobile: true,
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M16 4.5a3 3 0 0 1 0 5.9M21 20c0-2.8-2-5.1-4.5-5.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "inbox",
+    href: "/coordinator/inbox",
     label: "Feedback inbox",
     short: "Inbox",
     coordinatorOnly: true,
@@ -125,6 +156,20 @@ const NAV: NavDef[] = [
     ),
   },
   {
+    key: "org",
+    href: "/org",
+    label: "Org map",
+    short: "Org",
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none">
+        <rect x="9" y="3" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="3" y="16" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="15" y="16" width="6" height="5" rx="1.2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M12 8v4M6 16v-2h12v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     key: "profile",
     href: "/profile",
     label: "Profile",
@@ -152,14 +197,21 @@ const NAV: NavDef[] = [
 
 type Viewer = { isAdmin: boolean; isCoordinator: boolean };
 
-/** Coordinators get just their inbox + profile; members never see the inbox. */
+/** Coordinator-side accounts get their own small set; members never see any
+ *  of it. The org map is the one page both sides share. */
+const COORDINATOR_KEYS: NavKey[] = ["coHome", "inbox", "coreTeam", "org", "profile"];
+
 function visibleTo(n: NavDef, v: Viewer) {
-  if (v.isCoordinator) return n.key === "inbox" || n.key === "profile";
+  if (v.isCoordinator) return COORDINATOR_KEYS.includes(n.key);
   if (n.coordinatorOnly) return false;
   return !n.admin || v.isAdmin;
 }
 
 function isActive(pathname: string, href: string) {
+  // "/coordinator" is a real page with children ("/coordinator/inbox"), so
+  // it only lights up on an exact match — otherwise it would stay lit on
+  // every child route alongside the child's own item.
+  if (href === "/coordinator") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

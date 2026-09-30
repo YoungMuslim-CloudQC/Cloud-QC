@@ -23,7 +23,7 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<ProfileState> {
   const me = await assertApprovedAny();
-  const isCoordinator = me.role === "COORDINATOR";
+  const isCoordinator = me.scope.viewOnly && me.role !== "ADMIN";
 
   // Members only pick a sub-region; the state it sits in is derived here so
   // the two can never disagree.
@@ -37,8 +37,9 @@ export async function updateProfile(
     phone: formData.get("phone"),
     theme: formData.get("theme"),
     // Coordinators don't have the QC-only settings, so those are pinned
-    // to "off/none" rather than read from the form.
-    digestCadence: isCoordinator ? "OFF" : formData.get("digestCadence"),
+    // to "off/none" rather than read from the form — but they *do* choose a
+    // cadence now, for the summary of their own neighbornet.
+    digestCadence: formData.get("digestCadence"),
     notificationChannel: isCoordinator ? "EMAIL" : formData.get("notificationChannel"),
     smsConsent: isCoordinator ? false : formData.get("smsConsent"),
     homeRegion: isCoordinator ? "" : (regionBySubArea.get(pickedSubArea) ?? ""),
@@ -127,6 +128,11 @@ export async function updateProfile(
       homeSubArea: d.homeSubArea ?? null,
       digestSubAreas: d.digestSubAreas,
       representingNeighbornetId: d.representingNeighbornetId ?? null,
+      // Coordinator-only, and only touched when their form was the one
+      // submitted — a member's form never carries this field.
+      ...(isCoordinator
+        ? { alertOnNewFeedback: formData.get("alertOnNewFeedback") === "on" }
+        : {}),
       ...(imageUrl ? { image: imageUrl } : {}),
     },
   });
