@@ -1,11 +1,15 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getViewScope } from "@/lib/role-access";
 import { EMPTY_SCOPE, type ViewScope } from "@/lib/role-scope";
+
+/** Set while an admin is looking at the app through someone else's eyes. */
+export const VIEW_AS_COOKIE = "cloudqc_view_as";
 
 export type SessionUser = {
   id: string;
@@ -17,8 +21,21 @@ export type SessionUser = {
   theme: string;
 };
 
+/** Who the admin really is, while they're viewing as someone else. Present
+ *  only during impersonation, and the reason every write is refused: the
+ *  point is to *see* what a coordinator sees, never to act as them and
+ *  leave their fingerprints on the data. */
+export type Impersonation = {
+  realId: string;
+  realName: string;
+  viewingName: string;
+};
+
 /** A session user plus what their coordinator-side seats let them see. */
-export type ScopedUser = SessionUser & { scope: ViewScope };
+export type ScopedUser = SessionUser & {
+  scope: ViewScope;
+  impersonating: Impersonation | null;
+};
 
 /** Returns the session user or `null`. Never redirects. */
 export async function getSessionUser(): Promise<SessionUser | null> {
@@ -47,12 +64,69 @@ async function getFreshUser(): Promise<SessionUser | null> {
   return { ...user, role, status: row.status };
 }
 
-/** Same, plus their resolved view scope. */
+/**
+ * Same, plus their resolved view scope — and, for an admin who has picked
+ * someone to view as, the *target's* identity and scope instead of their
+ * own. Everything downstream then behaves exactly as it would for that
+ * person: same redirects, same nav, same neighbornets, same empty states.
+ *
+ * `impersonating` carries the admin's real identity so the banner can show
+ * it and the write guards can refuse.
+ */
 async function getFreshScopedUser(): Promise<ScopedUser | null> {
-  const user = await getFreshUser();
-  if (!user) return null;
-  const scope = await getViewScope(user.id);
-  return { ...user, scope };
+  const real = await getFreshUser();
+  if (!real) return null;
+
+  if (real.role === "ADMIN") {
+    const targetId = (await cookies()).get(VIEW_AS_COOKIE)?.value;
+    if (targetId && targetId !== real.id) {
+      const target = await db.user.findUnique({
+        where: { id: targetId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          role: true,
+          status: true,
+          theme: true,
+        },
+      });
+      if (target) {
+        return {
+          id: target.id,
+          name: target.name,
+          email: target.email,
+          image: target.image,
+          role: target.role === "ADMIN" ? "ADMIN" : "MEMBER",
+          status: target.status,
+          // Keep the admin's own theme — swapping it mid-session is
+          // disorienting and tells them nothing about what the other
+          // person sees structurally.
+          theme: real.theme,
+          scope: await getViewScope(target.id),
+          impersonating: {
+            realId: real.id,
+            realName: real.name ?? real.email ?? "Admin",
+            viewingName: target.name ?? target.email ?? "that account",
+          },
+        };
+      }
+    }
+  }
+
+  return { ...real, scope: await getViewScope(real.id), impersonating: null };
+}
+
+/** The signed-in admin themselves, ignoring any view-as in effect. Used by
+ *  the controls that start and stop impersonation — those must answer to
+ *  the real account, not the borrowed one. */
+export async function requireRealAdmin(): Promise<SessionUser> {
+  const real = await getFreshUser();
+  if (!real || real.status !== "APPROVED" || real.role !== "ADMIN") {
+    throw new Error("Forbidden: admin only");
+  }
+  return real;
 }
 
 /** Signed-in, APPROVED user of any kind — QC member, admin, or someone
@@ -105,6 +179,15 @@ export async function assertApprovedAny(): Promise<ScopedUser> {
   const user = await getFreshScopedUser();
   if (!user || user.status !== "APPROVED") {
     throw new Error("Unauthorized");
+  }
+  // Every server action funnels through here, so this one check makes the
+  // whole of view-as read-only. Without it an admin looking at someone's
+  // inbox could tick their visits off as read, or add people to their core
+  // team, and the record would show that person doing it.
+  if (user.impersonating) {
+    throw new Error(
+      "You're viewing as someone else — stop before making changes.",
+    );
   }
   return user;
 }

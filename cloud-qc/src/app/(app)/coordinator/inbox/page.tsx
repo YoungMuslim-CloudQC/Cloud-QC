@@ -138,7 +138,7 @@ export default async function CoordinatorInboxPage({
           {chip(q({ show: "" }), `All ${visits.length}`, !unreadOnly)}
           {chip(q({ show: "unread" }), `Unread ${unreadIds.length}`, unreadOnly)}
         </div>
-        <MarkAllReviewed visitIds={unreadIds} />
+        <MarkAllReviewed visitIds={unreadIds} readOnly={Boolean(user.impersonating)} />
       </div>
 
       {myNns.length > 1 && (
@@ -236,7 +236,7 @@ export default async function CoordinatorInboxPage({
                 </div>
 
                 <div style={{ marginTop: 12 }}>
-                  <ReviewToggle visitId={v.id} reviewed={isRead} />
+                  <ReviewToggle visitId={v.id} reviewed={isRead} readOnly={Boolean(user.impersonating)} />
                 </div>
               </div>
             );

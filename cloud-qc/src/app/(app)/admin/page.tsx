@@ -107,6 +107,18 @@ export default async function AdminPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">View as</div>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
+          See the app exactly as a coordinator or SR coordinator sees it —
+          their navigation, their neighbornets, their unread counts.
+          Read-only: every action is blocked while you&rsquo;re in it.
+        </p>
+        <Link className="btn btn-secondary btn-small" href="/admin/view-as">
+          Pick someone to view as
+        </Link>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
         <div className="section-label">Archives</div>
         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 10px" }}>
           Deleted visits keep their full history and can be restored. Archived

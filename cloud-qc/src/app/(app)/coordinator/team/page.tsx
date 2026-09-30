@@ -79,7 +79,11 @@ export default async function CoreTeamPage() {
           Cloud QC team can&rsquo;t be added here — it would stop them logging
           visits, so an admin sets that up instead.
         </p>
-        <CoreTeamManager mode="add" />
+        {user.impersonating ? (
+          <div className="survey-time-note">Read-only while viewing as someone else.</div>
+        ) : (
+          <CoreTeamManager mode="add" />
+        )}
       </div>
     </>
   );

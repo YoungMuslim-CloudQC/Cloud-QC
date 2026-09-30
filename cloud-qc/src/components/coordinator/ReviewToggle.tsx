@@ -9,15 +9,29 @@ import {
 } from "@/server/actions/coordinator";
 
 /** Per-card "I've read this". Optimism isn't worth it here — the click
- *  revalidates the page anyway, and a wrong tick is worse than a slow one. */
+ *  revalidates the page anyway, and a wrong tick is worse than a slow one.
+ *
+ *  `readOnly` is set when an admin is viewing as someone: the server would
+ *  refuse the write regardless, so the control is disabled rather than left
+ *  looking live and throwing on click. */
 export function ReviewToggle({
   visitId,
   reviewed,
+  readOnly = false,
 }: {
   visitId: string;
   reviewed: boolean;
+  readOnly?: boolean;
 }) {
   const [pending, start] = useTransition();
+
+  if (readOnly) {
+    return (
+      <span className="survey-time-note">
+        {reviewed ? "They've read this" : "They haven't read this yet"}
+      </span>
+    );
+  }
 
   return (
     <button
@@ -37,9 +51,15 @@ export function ReviewToggle({
   );
 }
 
-export function MarkAllReviewed({ visitIds }: { visitIds: string[] }) {
+export function MarkAllReviewed({
+  visitIds,
+  readOnly = false,
+}: {
+  visitIds: string[];
+  readOnly?: boolean;
+}) {
   const [pending, start] = useTransition();
-  if (visitIds.length === 0) return null;
+  if (visitIds.length === 0 || readOnly) return null;
 
   return (
     <button
