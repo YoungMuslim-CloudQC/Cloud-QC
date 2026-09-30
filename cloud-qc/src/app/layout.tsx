@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { auth } from "@/lib/auth";
 import { AuthSessionProvider } from "@/components/AuthSessionProvider";
+import { StaleBuildGuard } from "@/components/StaleBuildGuard";
 import { THEMES } from "@/lib/profile-schema";
 
 const display = Space_Grotesk({
@@ -63,6 +64,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       data-theme={theme}
     >
       <body>
+        <StaleBuildGuard />
         <AuthSessionProvider session={session}>
           {children}
         </AuthSessionProvider>

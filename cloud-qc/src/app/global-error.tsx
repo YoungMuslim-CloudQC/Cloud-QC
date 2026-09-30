@@ -8,6 +8,7 @@ import {
   SPRITE_H,
   SPRITE_W,
 } from "@/lib/pixel-mascot";
+import { isStaleBuildError, reloadForStaleBuild } from "@/lib/stale-build";
 
 /**
  * The last line of defence: this replaces the root layout, so it renders its
@@ -23,6 +24,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const stale = isStaleBuildError(error);
 
   // Outfit chosen inside the effect, never during render, so the server and
   // the browser can't disagree about which one it is.
@@ -30,6 +32,12 @@ export default function GlobalError({
     const ctx = ref.current?.getContext("2d");
     if (ctx) drawMascot(ctx, randomCostume());
   }, []);
+
+  // A deploy landed under this tab and took the chunks with it. reset()
+  // can't recover from that; only re-fetching the HTML can.
+  useEffect(() => {
+    if (stale) reloadForStaleBuild();
+  }, [stale]);
 
   return (
     <html lang="en">
@@ -95,7 +103,7 @@ export default function GlobalError({
         </div>
 
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: "10px 0 0" }}>
-          Cloud QC fell over
+          {stale ? "Cloud QC was updated" : "Cloud QC fell over"}
         </h1>
         <p
           style={{
@@ -106,8 +114,9 @@ export default function GlobalError({
             margin: "6px 0 0",
           }}
         >
-          Something failed before the app could even start drawing. Reloading
-          usually clears it.
+          {stale
+            ? "This tab is running an older version. Reloading picks up the new one."
+            : "Something failed before the app could even start drawing. Reloading usually clears it."}
         </p>
         {error.digest && (
           <div
@@ -124,7 +133,7 @@ export default function GlobalError({
         )}
         <button
           type="button"
-          onClick={reset}
+          onClick={() => (stale ? window.location.reload() : reset())}
           style={{
             marginTop: 18,
             background: "#7c3aed",
