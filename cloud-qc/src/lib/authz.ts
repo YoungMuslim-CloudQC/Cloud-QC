@@ -150,6 +150,16 @@ export async function requireApproved(): Promise<ScopedUser> {
 
 /** Requires an APPROVED admin. Redirects otherwise. */
 export async function requireAdmin(): Promise<ScopedUser> {
+  // An admin part-way through a view-as fails the checks below, because the
+  // whole point is that they're carrying the other person's identity: the
+  // role is theirs, the scope is theirs, and requireApproved sends them to
+  // /coordinator like it would send that person. That's right for every
+  // other screen and wrong here — it means clicking "Admin" silently lands
+  // on someone else's dashboard, which reads as the admin pages being
+  // broken rather than as view-as still being on. Say so instead.
+  const current = await getFreshScopedUser();
+  if (current?.impersonating) redirect("/admin/paused");
+
   const user = await requireApproved();
   if (user.role !== "ADMIN") redirect("/dashboard");
   return user;

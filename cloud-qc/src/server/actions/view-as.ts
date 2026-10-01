@@ -47,9 +47,19 @@ export async function startViewAs(formData: FormData) {
   redirect("/coordinator");
 }
 
-export async function stopViewAs() {
+/** Stop viewing as someone. Takes an optional destination so the "you're
+ *  still viewing as someone" screen can put the admin where they were
+ *  actually trying to go, rather than bouncing them back to the picker they
+ *  just came from. Only same-origin app paths are honoured. */
+export async function stopViewAs(formData?: FormData) {
   await requireRealAdmin();
   const jar = await cookies();
   jar.delete(VIEW_AS_COOKIE);
-  redirect("/admin/view-as");
+
+  const raw = formData?.get("next");
+  const next = typeof raw === "string" ? raw : "";
+  // A leading single slash only — "//evil.com" and "https://…" are both
+  // absolute destinations as far as the browser is concerned.
+  const safe = /^\/(?!\/)[A-Za-z0-9\-._~!$&'()*+,;=:@%/?#[\]]*$/.test(next);
+  redirect(safe ? next : "/admin/view-as");
 }
