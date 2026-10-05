@@ -31,6 +31,12 @@ export default auth((req) => {
   // break every scheduled run).
   if (path.startsWith("/api/cron/")) return NextResponse.next();
 
+  // Twilio's inbound webhook, same reasoning: it arrives with no session
+  // cookie, and a redirect to login here means STOP is never recorded on
+  // our side. The route verifies Twilio's HMAC signature itself, so it is
+  // authenticated — just not by a session.
+  if (path.startsWith("/api/sms/")) return NextResponse.next();
+
   const matches = (list: string[]) =>
     list.some((p) => path === p || path.startsWith(`${p}/`));
 
