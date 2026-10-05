@@ -149,6 +149,8 @@ model User {
   notificationChannel NotificationChannel @default(EMAIL)
   smsConsent          Boolean             @default(false)
   smsConsentAt        DateTime?
+  // Append-only proof behind the boolean above — see SmsConsentEvent.
+  smsConsentEvents    SmsConsentEvent[]   @relation("SmsConsentUser")
   lastDigestSentAt    DateTime? // when their most recent digest email actually went out
 
   // "Where I'm from" — matches Neighbornet.region/subArea's shape (not a FK;
@@ -624,4 +626,57 @@ model AppSetting {
   value       Json
   updatedAt   DateTime @updatedAt
   updatedById String?
+}
+
+// ---------------------------------------------------------------------------
+// SMS consent log — one row per opt-in or opt-out event, append-only.
+//
+// Separate from User.smsConsent on purpose. That field answers "can we text
+// this person right now?"; this table answers "prove they agreed, and to
+// what." Carrier campaign reviews and TCPA disputes both ask the second
+// question, and a boolean can't answer it: it has no timestamp of the event
+// itself, no record of the wording that was on screen, and it's overwritten
+// the moment the person changes their mind.
+//
+// Rows are never updated or deleted — an opt-out is a new REVOKED row, so
+// the history stays readable in order.
+// ---------------------------------------------------------------------------
+
+enum SmsConsentAction {
+  GRANTED
+  REVOKED
+}
+
+model SmsConsentEvent {
+  id     String           @id @default(cuid())
+  action SmsConsentAction
+
+  // Stored E.164 ("+15551234567") so the same person typing it three
+  // different ways still matches one record.
+  phone String
+
+  // Exactly what was on screen when they ticked the box. Snapshotted rather
+  // than referenced, because the wording on /sms-opt-in will change and the
+  // proof has to be of what *they* saw, not of what it says today.
+  consentText String
+
+  // Where it came from: "web-form" (the public page), "profile" (an existing
+  // member changing their own settings), "sms-stop" (an inbound STOP).
+  source String
+
+  // Kept because a consent record that can't be tied to a moment and an
+  // origin isn't worth much in a dispute. Disclosed in the privacy policy.
+  ipAddress String?
+  userAgent String?
+
+  // Set when the number matches a known account. Null is normal and fine —
+  // someone can opt in before an account exists, or from a personal number
+  // that was never added to their profile.
+  userId String?
+  user   User?   @relation("SmsConsentUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([userId])
 }

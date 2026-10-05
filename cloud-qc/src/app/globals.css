@@ -3126,3 +3126,282 @@ tr:last-child td {
   font-size: 11.5px;
   color: var(--text-muted);
 }
+
+/* ---------------------------------------------------------------------------
+   Public SMS opt-in + legal pages.
+
+   These render outside the app shell and are seen by people with no account
+   — a carrier reviewer, or a member following a link from a text. They use
+   the theme tokens but stand on their own: centred, single column, readable
+   on a phone, and no dependency on the sidebar layout.
+   --------------------------------------------------------------------------- */
+
+.optin-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px 64px;
+}
+
+.optin-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px 26px 30px;
+}
+
+.optin-title {
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+  text-align: center;
+}
+
+.optin-intro {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 22px;
+  text-align: center;
+}
+
+.optin-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.optin-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 16px; /* 16px stops iOS zooming the page on focus */
+  color: var(--text);
+  font-family: inherit;
+}
+
+.optin-input:focus-visible {
+  outline: 2px solid var(--accent, #7c3aed);
+  outline-offset: 1px;
+}
+
+.optin-help {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 6px 0 18px;
+}
+
+.optin-consent {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  cursor: pointer;
+  margin-bottom: 22px;
+}
+
+.optin-checkbox {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin: 1px 0 0;
+  accent-color: var(--accent, #7c3aed);
+  cursor: pointer;
+}
+
+.optin-section { margin-bottom: 18px; }
+
+.optin-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.optin-types {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.optin-types strong { color: var(--text); }
+.optin-types li { margin-bottom: 5px; }
+
+.optin-terms {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.optin-terms dt {
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 10px;
+}
+
+.optin-terms dd {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.optin-agree {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.optin-legal {
+  font-size: 13px;
+  margin: 16px 0 0;
+}
+
+.optin-legal a {
+  color: var(--accent, #7c3aed);
+  text-decoration: underline;
+}
+
+.optin-error {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.optin-submit {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.optin-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.optin-done { text-align: center; }
+
+.optin-check {
+  width: 54px;
+  height: 54px;
+  margin: 4px auto 14px;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #34d399;
+  font-size: 27px;
+  line-height: 52px;
+}
+
+.optin-done-title {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.optin-done-sub {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+.optin-done-note {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* --- Terms / Privacy --- */
+
+.legal-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 40px 16px 72px;
+}
+
+.legal-doc {
+  width: 100%;
+  max-width: 680px;
+  color: var(--text);
+}
+
+.legal-doc h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.legal-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 26px;
+}
+
+.legal-doc h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 28px 0 8px;
+  color: var(--text);
+}
+
+.legal-doc p,
+.legal-doc li {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.legal-doc p { margin: 0 0 12px; }
+.legal-doc ul { margin: 0 0 12px; padding-left: 20px; }
+.legal-doc li { margin-bottom: 7px; }
+.legal-doc strong { color: var(--text); }
+
+.legal-doc a {
+  color: var(--accent, #7c3aed);
+  text-decoration: underline;
+}
+
+.legal-foot {
+  margin-top: 34px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .optin-card { padding: 22px 18px 24px; border-radius: 13px; }
+  .optin-title { font-size: 19px; }
+}

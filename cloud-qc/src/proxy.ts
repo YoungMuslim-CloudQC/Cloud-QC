@@ -7,7 +7,19 @@ import authConfig from "@/lib/auth.config";
 // read and verify the session JWT for route protection.
 const { auth } = NextAuth(authConfig);
 
+/** Auth pages: reachable signed out, redirected away from once signed in. */
 const PUBLIC_PATHS = ["/login", "/signup"];
+
+/**
+ * Open to everyone, signed in or not, and never redirected away from.
+ *
+ * The SMS opt-in form and the policies it links to have to be reachable by
+ * someone with no account at all — a carrier reviewing the A2P campaign
+ * opens them cold, and a redirect to /login reads as the opt-in not
+ * existing. They're also linked from text messages, which land on whatever
+ * device the person is holding.
+ */
+const OPEN_PATHS = ["/sms-opt-in", "/terms", "/privacy"];
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -19,9 +31,15 @@ export default auth((req) => {
   // break every scheduled run).
   if (path.startsWith("/api/cron/")) return NextResponse.next();
 
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => path === p || path.startsWith(`${p}/`),
-  );
+  const matches = (list: string[]) =>
+    list.some((p) => path === p || path.startsWith(`${p}/`));
+
+  // Checked before anything else, including the signed-in redirects below —
+  // an approved user following a STOP/HELP link from a text should land on
+  // the policy, not be bounced to their dashboard.
+  if (matches(OPEN_PATHS)) return NextResponse.next();
+
+  const isPublic = matches(PUBLIC_PATHS);
   const isPending = path === "/pending";
 
   // Not signed in
