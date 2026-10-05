@@ -43,3 +43,6 @@ next-env.d.ts
 
 .vercel
 .env*
+# Repeated after the `.env*` above, because that line re-ignores the example
+# file and the negation only counts if it comes last.
+!.env.example
