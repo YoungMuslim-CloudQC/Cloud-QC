@@ -6,6 +6,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { toE164 } from "@/lib/phone";
 import { SMS_CONSENT_TEXT } from "@/lib/sms-consent-copy";
+import { smsWelcome } from "@/lib/sms-templates";
+import { isConfigured, sendSms } from "@/lib/twilio";
 
 export type OptInResult =
   | { ok: true; phone: string }
@@ -99,6 +101,20 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
       });
     }
   });
+
+  // The confirmation text, sent straight after the opt-in. This is the one
+  // message that deliberately bypasses sendToUser's consent lookup: consent
+  // was just given, in this request, and for someone with no account there
+  // is no user row to look it up from.
+  //
+  // Never fails the opt-in. The consent is recorded either way, and telling
+  // someone their sign-up failed because a text didn't go out would be both
+  // wrong and alarming.
+  if (isConfigured()) {
+    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const sent = await sendSms(phone, smsWelcome(appUrl));
+    if (!sent.ok) console.error("Opt-in welcome text failed:", sent.error);
+  }
 
   return { ok: true, phone };
 }

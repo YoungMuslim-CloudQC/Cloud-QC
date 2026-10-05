@@ -6,6 +6,8 @@ import { buildDigestContent, digestEmailHtml, isDigestDue } from "@/lib/digest";
 import { buildCoordinatorDigestContent } from "@/lib/coordinator-digest";
 import { sendDigestEmail } from "@/lib/resend";
 import { memberName } from "@/lib/queries";
+import { sendToUser } from "@/lib/sms-send";
+import { smsDigest } from "@/lib/sms-templates";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
     },
   });
 
-  const results: { userId: string; email: string; outcome: string }[] = [];
+  const results: { userId: string; email: string; outcome: string; sms?: string }[] = [];
 
   for (const u of candidates) {
     if (u.digestCadence === "OFF") continue; // narrows the type for TS below
@@ -63,12 +65,31 @@ export async function GET(req: Request) {
         appUrl,
       });
       const sent = await sendDigestEmail({ to: u.email, subject, html });
+
+      // The text is a second delivery of the same digest, not a different
+      // message. sendToUser decides whether it's allowed — if they picked
+      // email only, or never consented, it declines and says why.
+      const text = await sendToUser(
+        u.id,
+        smsDigest({
+          firstName: memberName(u).split(" ")[0] ?? "there",
+          attentionCount: content.attention.length,
+          onTrackCount: content.onTrackNames.length,
+          appUrl,
+        }),
+      );
+
       if (sent.ok) {
         await db.user.update({
           where: { id: u.id },
           data: { lastDigestSentAt: now },
         });
-        results.push({ userId: u.id, email: u.email, outcome: "sent" });
+        results.push({
+          userId: u.id,
+          email: u.email,
+          outcome: "sent",
+          sms: text.ok ? "sent" : text.reason,
+        });
       } else {
         results.push({ userId: u.id, email: u.email, outcome: `failed: ${sent.error}` });
       }
@@ -114,12 +135,26 @@ export async function GET(req: Request) {
         appUrl,
       });
       const sent = await sendDigestEmail({ to: u.email, subject, html });
+      const text = await sendToUser(
+        u.id,
+        smsDigest({
+          firstName: memberName(u).split(" ")[0] ?? "there",
+          attentionCount: content.attention.length,
+          onTrackCount: content.onTrackNames.length,
+          appUrl,
+        }),
+      );
       if (sent.ok) {
         await db.user.update({
           where: { id: u.id },
           data: { lastDigestSentAt: now },
         });
-        results.push({ userId: u.id, email: u.email, outcome: "sent" });
+        results.push({
+          userId: u.id,
+          email: u.email,
+          outcome: "sent",
+          sms: text.ok ? "sent" : text.reason,
+        });
       } else {
         results.push({ userId: u.id, email: u.email, outcome: `failed: ${sent.error}` });
       }
