@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { put } from "@vercel/blob";
 
 import { assertApprovedAny } from "@/lib/authz";
@@ -11,6 +12,8 @@ import {
   ALLOWED_PHOTO_TYPES,
 } from "@/lib/profile-schema";
 import { buildDigestContent, digestEmailHtml } from "@/lib/digest";
+import { toE164 } from "@/lib/phone";
+import { SMS_CONSENT_TEXT } from "@/lib/sms-consent-copy";
 import { sendDigestEmail } from "@/lib/resend";
 import { memberName, getRegionMap } from "@/lib/queries";
 
@@ -136,6 +139,29 @@ export async function updateProfile(
       ...(imageUrl ? { image: imageUrl } : {}),
     },
   });
+
+  // Log the consent *change*, not the state, so the history reads as a
+  // sequence of decisions. Saving the profile with the box already ticked
+  // isn't a new consent and mustn't look like one.
+  if (d.smsConsent !== before.smsConsent) {
+    const phone = d.phone ? toE164(d.phone) : null;
+    // Without a storable number there's nothing a consent record could be
+    // about — the schema already refuses SMS/BOTH in that case.
+    if (phone) {
+      const h = await headers();
+      await db.smsConsentEvent.create({
+        data: {
+          action: d.smsConsent ? "GRANTED" : "REVOKED",
+          phone,
+          consentText: SMS_CONSENT_TEXT,
+          source: "profile",
+          ipAddress: h.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+          userAgent: h.get("user-agent")?.slice(0, 500) || null,
+          userId: me.id,
+        },
+      });
+    }
+  }
 
   // Selecting a cadence (turning it on, or picking a different one) sends
   // an immediate digest right then, rather than making them wait for the

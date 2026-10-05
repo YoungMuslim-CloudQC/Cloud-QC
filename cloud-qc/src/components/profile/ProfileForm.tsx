@@ -10,6 +10,13 @@ import { Avatar } from "@/components/Avatar";
 import { AreaMultiSelect } from "@/components/profile/AreaMultiSelect";
 import { SubRegionSelect } from "@/components/SubRegionSelect";
 import { flattenRegionMap, parseArea, subValue } from "@/lib/sub-regions";
+import {
+  SMS_CONSENT_TEXT,
+  SMS_FREQUENCY_LINE,
+  SMS_HELP_STOP_LINE,
+  SMS_NO_MARKETING_LINE,
+  SMS_RATES_LINE,
+} from "@/lib/sms-consent-copy";
 
 const INITIAL: ProfileState = {};
 
@@ -35,8 +42,8 @@ function digestNote(cadence: Cadence, channel: Channel, isNewSelection: boolean)
     channel === "EMAIL"
       ? "by email"
       : channel === "SMS"
-        ? "by text once SMS notifications are live — by email in the meantime"
-        : "by email now, and by text too once SMS notifications are live";
+        ? "by text once carrier approval completes — by email until then"
+        : "by email now, and by text too once carrier approval completes";
   const lead = isNewSelection
     ? "You'll get one right away (unless you've had one in the last 24 hours), then "
     : "Sent ";
@@ -288,11 +295,10 @@ export function ProfileForm({
             <span>
               <span className="toggle-option-label">
                 Text message
-                <span className="tag-construction">Under construction</span>
               </span>
               <div className="toggle-option-desc">
-                Requires a phone number and consent below. Not sending yet —
-                save your preference now for when it launches.
+                Requires a phone number and consent below. Texts start once
+                carrier approval completes — set your preference now.
               </div>
             </span>
           </label>
@@ -308,27 +314,44 @@ export function ProfileForm({
             <span>
               <span className="toggle-option-label">
                 Both
-                <span className="tag-construction">Under construction</span>
               </span>
-              <div className="toggle-option-desc">Email now, text once it&rsquo;s live.</div>
+              <div className="toggle-option-desc">
+                Email now, text too once carrier approval completes.
+              </div>
             </span>
           </label>
         </div>
       </div>
 
+      {/* Carries the same wording as the public opt-in form, because this is
+          the other place consent can be given and the two have to be
+          equivalent — a thinner version here would be the weakest link in
+          the consent record. */}
       <div className="field">
-        <label className="toggle-option" style={{ alignItems: "center" }}>
+        <label className="toggle-option" style={{ alignItems: "flex-start" }}>
           <input
             type="checkbox"
             name="smsConsent"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
           />
-          <span className="toggle-option-desc">
-            I agree to receive text messages from Cloud QC at the phone number
-            above once that feature launches. Message/data rates may apply.
-          </span>
+          <span className="toggle-option-desc">{SMS_CONSENT_TEXT}</span>
         </label>
+        <div className="sms-disclosures">
+          <div>{SMS_FREQUENCY_LINE}</div>
+          <div>{SMS_RATES_LINE}</div>
+          <div>{SMS_HELP_STOP_LINE}</div>
+          <div>{SMS_NO_MARKETING_LINE}</div>
+          <div style={{ marginTop: 6 }}>
+            <a href="/terms" target="_blank" rel="noreferrer">
+              Terms of Service
+            </a>
+            {" | "}
+            <a href="/privacy" target="_blank" rel="noreferrer">
+              Privacy Policy
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Lighter box on purpose — its content depends on the channel picked
