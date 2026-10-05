@@ -12,12 +12,38 @@ import "server-only";
  * actually possible, so nothing has to guess or pretend.
  */
 
+/**
+ * Twilio's SID prefixes are meaningful, and the two that matter here look
+ * similar enough to swap by accident: an Account SID starts AC, a Messaging
+ * Service SID starts MG. Putting the account SID in the service slot gets
+ * you a 404 on a URL you didn't knowingly build, which is a confusing way
+ * to find out — so check the shape up front and say which one is wrong.
+ */
+export function configProblems(): string[] {
+  const problems: string[] = [];
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+  if (!sid) problems.push("TWILIO_ACCOUNT_SID is not set");
+  else if (!sid.startsWith("AC"))
+    problems.push("TWILIO_ACCOUNT_SID should start with 'AC'");
+
+  if (!token) problems.push("TWILIO_AUTH_TOKEN is not set");
+
+  if (!service) problems.push("TWILIO_MESSAGING_SERVICE_SID is not set");
+  else if (service.startsWith("AC"))
+    problems.push(
+      "TWILIO_MESSAGING_SERVICE_SID holds an Account SID (AC...) — it needs the Messaging Service SID, which starts with 'MG'",
+    );
+  else if (!service.startsWith("MG"))
+    problems.push("TWILIO_MESSAGING_SERVICE_SID should start with 'MG'");
+
+  return problems;
+}
+
 export function isConfigured(): boolean {
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_MESSAGING_SERVICE_SID,
-  );
+  return configProblems().length === 0;
 }
 
 export type SendResult =
@@ -36,12 +62,9 @@ export async function sendSms(to: string, body: string): Promise<SendResult> {
   const token = process.env.TWILIO_AUTH_TOKEN;
   const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
-  if (!sid || !token || !service) {
-    return {
-      ok: false,
-      error:
-        "Twilio is not configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_MESSAGING_SERVICE_SID.",
-    };
+  const problems = configProblems();
+  if (problems.length || !sid || !token || !service) {
+    return { ok: false, error: `Twilio config: ${problems.join("; ")}` };
   }
 
   const params = new URLSearchParams({

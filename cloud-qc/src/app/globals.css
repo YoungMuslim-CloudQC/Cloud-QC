@@ -3419,3 +3419,18 @@ tr:last-child td {
   color: var(--accent, #7c3aed);
   text-decoration: underline;
 }
+
+/* Admin test-notification controls. Wraps rather than squeezing, so the
+   buttons stay full-size on a phone. */
+.test-notify-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.test-notify-sms {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}

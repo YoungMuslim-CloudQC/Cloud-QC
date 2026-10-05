@@ -6,12 +6,19 @@ import { getSettings, getRegionMap } from "@/lib/queries";
 import { PageHead } from "@/components/PageHead";
 import { approveUser, rejectUser, setUserRole } from "@/server/actions/admin";
 import { DashboardAdjustments } from "@/components/admin/DashboardAdjustments";
+import { TestNotifications } from "@/components/admin/TestNotifications";
+import { configProblems } from "@/lib/twilio";
 import { CoordinatorAssign } from "@/components/admin/CoordinatorAssign";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const me = await requireAdmin();
+
+  // Resolved on the server so the panel can say exactly what is wrong
+  // rather than just refusing. Descriptions only — no value reaches the
+  // client, and the token is never read here at all.
+  const smsMissing = configProblems();
 
   const withNns = {
     roleAssignments: {
@@ -81,6 +88,15 @@ export default async function AdminPage() {
         <DashboardAdjustments
           manualOffset={settings.manualOffset}
           goal={settings.goal}
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-label">Test notifications</div>
+        <TestNotifications
+          adminEmail={me.email ?? "your account email"}
+          smsReady={smsMissing.length === 0}
+          missingSmsVars={smsMissing}
         />
       </div>
 
