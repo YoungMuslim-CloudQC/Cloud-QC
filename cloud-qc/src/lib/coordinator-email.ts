@@ -4,13 +4,19 @@ import { db } from "@/lib/db";
 import { isoDate, statusMeta } from "@/lib/format";
 import { memberName } from "@/lib/queries";
 import { sendDigestEmail } from "@/lib/resend";
+import { sendToUser } from "@/lib/sms-send";
+import { smsFeedbackAlert } from "@/lib/sms-templates";
 
 /**
- * Emailing coordinators when feedback lands is opt-in twice over: the
+ * Notifying coordinators when feedback lands is opt-in twice over: the
  * COORDINATOR_EMAILS_ENABLED flag must be "true" AND the code must be running
  * on the production deployment. Local dev and Vercel previews share the
  * production database, so without the second condition a test submission
  * could email a real coordinator.
+ *
+ * The name says emails for history; it now gates the text as well, which is
+ * the behaviour you want from a kill switch — one place to stop bothering
+ * people, not one per channel.
  */
 export function coordinatorEmailsEnabled(): boolean {
   return (
@@ -48,7 +54,18 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
                 roleAssignments: {
                   where: { roleType: "COORDINATOR" },
                   select: {
-                    user: { select: { email: true, name: true, status: true } },
+                    user: {
+                      select: {
+                        id: true,
+                        email: true,
+                        name: true,
+                        status: true,
+                        // Their own switch for this specific alert. Whether
+                        // it then arrives as a text depends on their channel
+                        // and consent, which sendToUser decides.
+                        alertOnNewFeedback: true,
+                      },
+                    },
                   },
                 },
               },
@@ -65,7 +82,18 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
     // One email per coordinator, covering every NN of theirs this visit
     // touches — a joint event shouldn't double-email someone who
     // coordinates two of the tagged neighbornets.
-    const nnNamesByEmail = new Map<string, { user: { name: string | null; email: string }; nnNames: string[] }>();
+    const nnNamesByEmail = new Map<
+      string,
+      {
+        user: {
+          id: string;
+          name: string | null;
+          email: string;
+          alertOnNewFeedback: boolean;
+        };
+        nnNames: string[];
+      }
+    >();
     for (const link of visit.neighbornets) {
       for (const c of link.neighbornet.roleAssignments) {
         if (c.user.status !== "APPROVED") continue;
@@ -97,6 +125,24 @@ export async function notifyCoordinators(visitId: string): Promise<void> {
     </div>
   </div>`;
       await sendDigestEmail({ to: to.email, subject, html });
+
+      // Same notification, by text, for coordinators who want it that way.
+      // The link is the point: the text says something arrived and sends
+      // them to the inbox rather than trying to carry the feedback itself.
+      //
+      // sendToUser decides whether it's actually allowed — channel, consent
+      // and any STOP — so this doesn't need to re-check any of it. A failure
+      // is swallowed with the email's: the feedback is already saved, and no
+      // notification is worth losing it over.
+      if (to.alertOnNewFeedback) {
+        const sent = await sendToUser(
+          to.id,
+          smsFeedbackAlert({ neighbornetName: nnLabel, appUrl }),
+        );
+        if (!sent.ok) {
+          console.info(`Feedback text not sent to ${to.email}: ${sent.reason}`);
+        }
+      }
     }
   } catch {
     // Feedback is already saved; a failed notification must not undo that.
