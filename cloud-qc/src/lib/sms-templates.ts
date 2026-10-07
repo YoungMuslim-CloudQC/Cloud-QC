@@ -1,10 +1,11 @@
 /**
  * Every text Cloud QC will send, in one place.
  *
- * These double as the sample messages submitted with the A2P 10DLC campaign,
- * so the rule is: if a message can go out, its shape is in here. A campaign
- * approved on one set of samples and then used to send something different
- * is how a sender gets filtered.
+ * These are held against the toll-free verification filed for +18889877086
+ * (HH7a7d9cc1...): the sender identity and message types here must match the
+ * samples and use case declared there. Carriers compare live traffic to the
+ * filing after approval, so a message that doesn't fit the declaration puts
+ * the number's verification at risk — not just that one send.
  *
  * Conventions, all of them carrier expectations rather than style choices:
  *  - Every message opens with the brand, so it's identifiable out of context.
@@ -12,13 +13,20 @@
  *    the start of a conversation, carries the STOP footer.
  *  - No links to anything that isn't ours, and no URL shorteners — shortened
  *    links are a common filtering trigger.
+ *  - GSM-7 characters only. One smart quote or em dash forces the whole
+ *    message into UCS-2 and cuts the segment budget from 160 to 70.
  */
 
 import { SMS_BRAND, SMS_MAX_PER_MONTH } from "@/lib/sms-consent-copy";
 
-/** Prefixed to every outbound message. Short, because it's paid for in
- *  segments: anything over 160 GSM-7 characters bills as two. */
-export const SMS_SENDER_TAG = "Cloud QC";
+/**
+ * Prefixed to every outbound message.
+ *
+ * "Young Muslims", not "Cloud QC", because that is how the sender identifies
+ * itself in the declared samples. Cloud QC is the internal name of the tool;
+ * the filing is in the organisation's name, and the two have to agree.
+ */
+export const SMS_SENDER_TAG = "Young Muslims";
 
 export const SMS_STOP_FOOTER = "Reply STOP to opt out.";
 
@@ -50,7 +58,43 @@ export function smsStopReply(): string {
   );
 }
 
-/** The digest summary, mirroring the email that already goes out. */
+// --- The three declared message types -------------------------------------
+
+/** Declared sample 1: a site-visit assignment. */
+export function smsVisitAssignment(opts: {
+  neighbornetName: string;
+  period: string;
+}): string {
+  return (
+    `${SMS_SENDER_TAG}: You're assigned to visit the ${opts.neighbornetName} ` +
+    `NeighborNet ${opts.period}. Details in your dashboard. ${SMS_STOP_FOOTER}`
+  );
+}
+
+/** Declared sample 2: an outstanding visit report. */
+export function smsReportReminder(opts: { period: string }): string {
+  return (
+    `${SMS_SENDER_TAG}: Reminder - your QC visit report for ${opts.period} ` +
+    `is still pending. ${SMS_STOP_FOOTER}`
+  );
+}
+
+/** Declared sample 3: a rotation change. */
+export function smsRotationChange(opts: { onDate: string }): string {
+  return (
+    `${SMS_SENDER_TAG}: Your partner assignment rotates on ${opts.onDate}. ` +
+    `Check your dashboard for the new pairing. ${SMS_STOP_FOOTER}`
+  );
+}
+
+/**
+ * The periodic summary.
+ *
+ * Sits under the declared "reminders to submit visit reports" heading: it
+ * tells someone what is outstanding across the neighbornets they look after.
+ * Worded as a status reminder rather than a digest so it reads as the thing
+ * that was declared.
+ */
 export function smsDigest(opts: {
   firstName: string;
   attentionCount: number;
@@ -62,11 +106,8 @@ export function smsDigest(opts: {
     attentionCount > 0
       ? `${attentionCount} neighbornet${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} attention`
       : `all neighbornets on track`;
-  // Plain hyphen, not an em dash. A single non-GSM-7 character forces the
-  // whole message into UCS-2, which drops the segment budget from 160
-  // characters to 70 — this one would go from 1 segment to 3.
   return (
-    `${SMS_SENDER_TAG}: Hi ${firstName}, your QC summary - ${head}, ` +
+    `${SMS_SENDER_TAG}: Hi ${firstName}, your QC status - ${head}, ` +
     `${onTrackCount} on track. Details: ${appUrl}/coordinator. ${SMS_STOP_FOOTER}`
   );
 }
@@ -88,20 +129,24 @@ export function smsAnnouncement(opts: { body: string; appUrl: string }): string 
 }
 
 /**
- * The exact strings to paste into Twilio's campaign registration.
- *
- * Rendered with representative values rather than placeholders, because the
- * review is done by a human reading them as a recipient would — "Hi {{1}},
- * your {{2}}" tells them nothing about whether the traffic is legitimate.
+ * The strings submitted with the toll-free verification, in the order they
+ * were filed. Kept here so the filing and the code can be diffed directly
+ * rather than from memory.
  */
 export function campaignSampleMessages(appUrl = "https://cloud-qc.vercel.app"): {
   label: string;
   body: string;
 }[] {
   return [
+    {
+      label: "Site-visit assignment",
+      body: smsVisitAssignment({ neighbornetName: "Kearny", period: "this month" }),
+    },
+    { label: "Visit report reminder", body: smsReportReminder({ period: "September" }) },
+    { label: "Rotation change", body: smsRotationChange({ onDate: "Oct 15" }) },
     { label: "Opt-in confirmation", body: smsWelcome(appUrl) },
     {
-      label: "QC summary",
+      label: "QC status summary",
       body: smsDigest({ firstName: "Omar", attentionCount: 2, onTrackCount: 7, appUrl }),
     },
     {

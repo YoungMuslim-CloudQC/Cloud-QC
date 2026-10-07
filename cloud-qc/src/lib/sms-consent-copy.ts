@@ -24,26 +24,31 @@ export const SMS_STOP_KEYWORD = "STOP";
 
 /** The checkbox label. This is the sentence the person is agreeing to, so
  *  it names the sender, the message types and the frequency on its own —
- *  it has to stand up without the surrounding page. */
+ *  it has to stand up without the surrounding page.
+ *
+ *  The message types here must match the use case declared on the toll-free
+ *  verification. A reviewer opens this page and compares it against the
+ *  submission, and a page promising different things than the filing is a
+ *  rejection on its own. */
 export const SMS_CONSENT_TEXT =
   `Yes, I would like to receive automated text messages from ${SMS_BRAND} ` +
-  `about my neighbornet's QC summaries, new QC feedback on my neighbornet, ` +
-  `and occasional Cloud team announcements. I understand I will receive up ` +
-  `to ${SMS_MAX_PER_MONTH} messages per month.`;
+  `about my site-visit assignments, rotation changes, and reminders to ` +
+  `submit visit reports. I understand I will receive up to ` +
+  `${SMS_MAX_PER_MONTH} messages per month.`;
 
 /** Spelled out beneath the checkbox so nobody has to infer it. */
 export const SMS_MESSAGE_TYPES = [
   {
-    title: "QC summaries",
-    body: "A recap of how the neighbornets you look after are doing — what's on track and what needs attention.",
+    title: "Site-visit assignments",
+    body: "Which neighbornet you are visiting, and when it is due.",
   },
   {
-    title: "New feedback alerts",
-    body: "A note when QC logs a visit about your neighbornet, so you don't have to keep checking for it.",
+    title: "Rotation changes",
+    body: "When your partner assignment or rotation changes.",
   },
   {
-    title: "Cloud team announcements",
-    body: "Occasional operational notices — rotation changes, deadlines, new features.",
+    title: "Visit report reminders",
+    body: "A nudge when a visit report you owe is still outstanding, and a summary of how the neighbornets you look after are doing.",
   },
 ] as const;
 
