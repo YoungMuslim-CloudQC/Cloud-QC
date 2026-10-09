@@ -3,7 +3,9 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 
+import { getSessionUser } from "@/lib/authz";
 import { db } from "@/lib/db";
+import { readOptInToken } from "@/lib/optin-token";
 import { toE164 } from "@/lib/phone";
 import { SMS_CONSENT_TEXT } from "@/lib/sms-consent-copy";
 import { smsWelcome } from "@/lib/sms-templates";
@@ -64,20 +66,50 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
   const ipAddress = h.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
   const userAgent = h.get("user-agent")?.slice(0, 500) || null;
 
-  // Match to an account if we can, but never require one — someone can opt
-  // in from a number they've not added to their profile.
+  // Work out whose account this opt-in belongs to, most trustworthy source
+  // first. Getting it wrong is costly in both directions: unlinked means
+  // they opt in and then never receive anything, and wrongly linked means
+  // someone else's neighbornet updates go to this phone.
   //
-  // Compared in normalised form rather than with a SQL match, because
-  // profile numbers were typed freehand: the same number is stored as
-  // "201-555-9876", "(201) 555-9876" and "+1 201 555 9876" across rows, and
-  // none of those equal the E.164 we just built. The scan is over accounts
-  // that have a number at all, which is a small fraction of a small table.
-  const candidates = await db.user.findMany({
-    where: { phone: { not: null } },
-    select: { id: true, phone: true },
-  });
-  const userId =
-    candidates.find((c) => c.phone && toE164(c.phone) === phone)?.id ?? null;
+  //  1. A live session — they're signed in, nothing beats that.
+  //  2. A signed token from the invitation email. This is the common case:
+  //     almost nobody has a phone on their profile yet, which is precisely
+  //     why they're being invited.
+  //  3. The number itself, against profiles that already carry one.
+  //
+  // Null remains a valid outcome — an anonymous visitor (a carrier reviewer,
+  // say) can opt in, and the consent is recorded against the number alone.
+  let userId: string | null = null;
+
+  const session = await getSessionUser();
+  if (session) userId = session.id;
+
+  if (!userId) {
+    const token = formData.get("t");
+    if (typeof token === "string" && token) {
+      const fromToken = readOptInToken(token);
+      if (fromToken) {
+        const exists = await db.user.findUnique({
+          where: { id: fromToken },
+          select: { id: true },
+        });
+        userId = exists?.id ?? null;
+      }
+    }
+  }
+
+  if (!userId) {
+    // Compared in normalised form rather than with a SQL match, because
+    // profile numbers were typed freehand: the same number is stored as
+    // "201-555-9876", "(201) 555-9876" and "+1 201 555 9876" across rows,
+    // and none of those equal the E.164 we just built.
+    const candidates = await db.user.findMany({
+      where: { phone: { not: null } },
+      select: { id: true, phone: true },
+    });
+    userId =
+      candidates.find((c) => c.phone && toE164(c.phone) === phone)?.id ?? null;
+  }
 
   await db.$transaction(async (tx) => {
     await tx.smsConsentEvent.create({
@@ -95,9 +127,30 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
 
     // Keep the "can we text them right now?" flag in step with the log.
     if (userId) {
+      const current = await tx.user.findUnique({
+        where: { id: userId },
+        select: { notificationChannel: true },
+      });
+
       await tx.user.update({
         where: { id: userId },
-        data: { smsConsent: true, smsConsentAt: new Date(), phone },
+        data: {
+          smsConsent: true,
+          smsConsentAt: new Date(),
+          phone,
+          // Consent alone isn't enough to be reachable: sendToUser also
+          // requires a channel that includes SMS, and the default is EMAIL.
+          // Without this, someone opts in, sees a confirmation, and then
+          // never receives anything — refused by our own gate for a reason
+          // they were never shown.
+          //
+          // BOTH rather than SMS, because they asked to *also* get texts;
+          // silently switching their email off is not what they agreed to.
+          // Anyone who already chose SMS or BOTH keeps their choice.
+          ...(current?.notificationChannel === "EMAIL"
+            ? { notificationChannel: "BOTH" as const }
+            : {}),
+        },
       });
     }
   });

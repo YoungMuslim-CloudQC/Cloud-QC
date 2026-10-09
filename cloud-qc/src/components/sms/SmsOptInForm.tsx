@@ -16,7 +16,7 @@ import {
 } from "@/lib/sms-consent-copy";
 import { submitSmsOptIn } from "@/server/actions/sms-opt-in";
 
-export function SmsOptInForm() {
+export function SmsOptInForm({ token = "" }: { token?: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -69,6 +69,8 @@ export function SmsOptInForm() {
         Get your neighbornet&rsquo;s QC updates by text instead of digging
         through email.
       </p>
+
+      <input type="hidden" name="t" value={token} />
 
       <label className="optin-label" htmlFor="phone">
         Mobile Phone Number<span aria-hidden="true">*</span>

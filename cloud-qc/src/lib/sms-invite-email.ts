@@ -20,8 +20,15 @@ import {
 export function smsInviteEmail(opts: {
   firstName: string;
   appUrl: string;
+  /** Signed token identifying the recipient, so their consent lands on
+   *  their account rather than floating free. Without it they would opt in
+   *  and then never be reachable, because almost nobody has a phone number
+   *  on their profile yet. */
+  token: string;
 }): { subject: string; html: string } {
   const subject = "Want your Cloud QC updates by text?";
+
+  const optInUrl = `${opts.appUrl}/sms-opt-in?u=${encodeURIComponent(opts.token)}`;
 
   const types = SMS_MESSAGE_TYPES.map(
     (t) =>
@@ -52,7 +59,7 @@ export function smsInviteEmail(opts: {
         ${SMS_NO_MARKETING_LINE}
       </div>
 
-      <a href="${opts.appUrl}/sms-opt-in"
+      <a href="${optInUrl}"
          style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;font-weight:600;font-size:13.5px;padding:11px 20px;border-radius:7px;">
         Turn on text updates
       </a>
