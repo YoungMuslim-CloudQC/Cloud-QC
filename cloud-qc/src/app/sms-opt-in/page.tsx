@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { getSessionUser } from "@/lib/authz";
 import { SmsOptInForm } from "@/components/sms/SmsOptInForm";
 
 export const metadata: Metadata = {
@@ -23,9 +24,17 @@ export default async function SmsOptInPage({
   const { u } = await searchParams;
   const token = typeof u === "string" ? u : "";
 
+  // With neither a session nor a token there is nothing to attach the
+  // consent to, so it would be recorded against the bare number and the
+  // person would never actually be reachable. That is fine for an
+  // anonymous carrier reviewer and wrong for a member, and only the member
+  // can tell the difference — so say so rather than silently half-working.
+  const session = await getSessionUser();
+  const willLink = Boolean(session) || Boolean(token);
+
   return (
     <main className="optin-page">
-      <SmsOptInForm token={token} />
+      <SmsOptInForm token={token} willLink={willLink} />
     </main>
   );
 }

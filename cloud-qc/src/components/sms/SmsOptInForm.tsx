@@ -16,7 +16,15 @@ import {
 } from "@/lib/sms-consent-copy";
 import { submitSmsOptIn } from "@/server/actions/sms-opt-in";
 
-export function SmsOptInForm({ token = "" }: { token?: string }) {
+export function SmsOptInForm({
+  token = "",
+  willLink = true,
+}: {
+  token?: string;
+  /** False when nothing identifies the visitor, so the opt-in would not
+   *  attach to any account. */
+  willLink?: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -71,6 +79,15 @@ export function SmsOptInForm({ token = "" }: { token?: string }) {
       </p>
 
       <input type="hidden" name="t" value={token} />
+
+      {!willLink && (
+        <div className="optin-signin-note">
+          <strong>Already have a Cloud QC account?</strong>{" "}
+          <a href="/login?callbackUrl=%2Fsms-opt-in">Sign in first</a> so these
+          texts are tied to your account. Signing up here without it records
+          your number, but we won&rsquo;t know whose updates to send you.
+        </div>
+      )}
 
       <label className="optin-label" htmlFor="phone">
         Mobile Phone Number<span aria-hidden="true">*</span>
