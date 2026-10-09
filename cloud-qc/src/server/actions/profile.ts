@@ -14,6 +14,8 @@ import {
 import { buildDigestContent, digestEmailHtml } from "@/lib/digest";
 import { toE164 } from "@/lib/phone";
 import { SMS_CONSENT_TEXT } from "@/lib/sms-consent-copy";
+import { smsWelcome } from "@/lib/sms-templates";
+import { isConfigured, sendSms } from "@/lib/twilio";
 import { sendDigestEmail } from "@/lib/resend";
 import { memberName, getRegionMap } from "@/lib/queries";
 
@@ -160,6 +162,21 @@ export async function updateProfile(
           userId: me.id,
         },
       });
+
+      // Confirm it by text straight away, the same as the public opt-in
+      // form does — so someone who turns texts on from their profile gets
+      // the same proof it worked, and the same STOP instructions, rather
+      // than silence until the next digest a week later.
+      //
+      // Gated on the consent having just been GRANTED, not merely on a
+      // phone number being present. Saving a profile with a new number and
+      // the box untouched must not send anything: a number is not consent,
+      // and texting on that basis is what gets a verified sender shut off.
+      if (d.smsConsent && isConfigured()) {
+        const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+        const sent = await sendSms(phone, smsWelcome(appUrl));
+        if (!sent.ok) console.error("Profile opt-in text failed:", sent.error);
+      }
     }
   }
 
