@@ -25,11 +25,11 @@ const schema = z.object({
 /**
  * Record an SMS opt-in from the public form.
  *
- * Unauthenticated on purpose: the whole point of the page is that a carrier
- * reviewer, or a member who isn't signed in, can reach it. That means
- * treating everything here as hostile input — the number is re-validated
- * server-side, and consent is only ever taken from the submitted checkbox,
- * never defaulted.
+ * The page is public so anyone can read it — the disclosures are the opt-in
+ * proof — but submitting requires proof of who is opting in: a session, or
+ * a signed token from the invitation email. Everything else is treated as
+ * hostile input: the number is re-validated server-side, and consent is
+ * only ever taken from the submitted checkbox, never defaulted.
  */
 export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
   const parsed = schema.safeParse({
@@ -66,19 +66,20 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
   const ipAddress = h.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
   const userAgent = h.get("user-agent")?.slice(0, 500) || null;
 
-  // Work out whose account this opt-in belongs to, most trustworthy source
-  // first. Getting it wrong is costly in both directions: unlinked means
-  // they opt in and then never receive anything, and wrongly linked means
-  // someone else's neighbornet updates go to this phone.
+  // Whose account is this? Two sources, both of which actually prove it:
   //
-  //  1. A live session — they're signed in, nothing beats that.
-  //  2. A signed token from the invitation email. This is the common case:
-  //     almost nobody has a phone on their profile yet, which is precisely
-  //     why they're being invited.
-  //  3. The number itself, against profiles that already carry one.
+  //  1. A live session — they're signed in.
+  //  2. A signed token from their invitation email.
   //
-  // Null remains a valid outcome — an anonymous visitor (a carrier reviewer,
-  // say) can opt in, and the consent is recorded against the number alone.
+  // An opt-in that can't be attached to an account is refused outright. It
+  // would otherwise record a number nobody can be reached on, and the
+  // person would never know: confirmation on screen, welcome text, then
+  // silence forever.
+  //
+  // Matching on the typed number was deliberately dropped as an identity
+  // source. It let anyone who knows a colleague's mobile opt that colleague
+  // in — and, since opting in also writes the number onto the account,
+  // redirect their neighbornet updates to a phone they don't own.
   let userId: string | null = null;
 
   const session = await getSessionUser();
@@ -99,16 +100,11 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
   }
 
   if (!userId) {
-    // Compared in normalised form rather than with a SQL match, because
-    // profile numbers were typed freehand: the same number is stored as
-    // "201-555-9876", "(201) 555-9876" and "+1 201 555 9876" across rows,
-    // and none of those equal the E.164 we just built.
-    const candidates = await db.user.findMany({
-      where: { phone: { not: null } },
-      select: { id: true, phone: true },
-    });
-    userId =
-      candidates.find((c) => c.phone && toE164(c.phone) === phone)?.id ?? null;
+    return {
+      ok: false,
+      error:
+        "Sign in to Cloud QC first, then come back — we need to know whose account to attach this number to.",
+    };
   }
 
   await db.$transaction(async (tx) => {
@@ -126,7 +122,7 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
     });
 
     // Keep the "can we text them right now?" flag in step with the log.
-    if (userId) {
+    {
       const current = await tx.user.findUnique({
         where: { id: userId },
         select: { notificationChannel: true },
@@ -155,10 +151,9 @@ export async function submitSmsOptIn(formData: FormData): Promise<OptInResult> {
     }
   });
 
-  // The confirmation text, sent straight after the opt-in. This is the one
-  // message that deliberately bypasses sendToUser's consent lookup: consent
-  // was just given, in this request, and for someone with no account there
-  // is no user row to look it up from.
+  // The confirmation text, sent straight after the opt-in. Deliberately
+  // bypasses sendToUser's consent lookup: consent was given moments ago in
+  // this same request, and re-reading it would race the write above.
   //
   // Never fails the opt-in. The consent is recorded either way, and telling
   // someone their sign-up failed because a text didn't go out would be both

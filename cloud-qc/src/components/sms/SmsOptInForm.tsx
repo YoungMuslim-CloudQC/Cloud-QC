@@ -82,10 +82,10 @@ export function SmsOptInForm({
 
       {!willLink && (
         <div className="optin-signin-note">
-          <strong>Already have a Cloud QC account?</strong>{" "}
-          <a href="/login?callbackUrl=%2Fsms-opt-in">Sign in first</a> so these
-          texts are tied to your account. Signing up here without it records
-          your number, but we won&rsquo;t know whose updates to send you.
+          <strong>Sign in to continue.</strong>{" "}
+          <a href="/login?callbackUrl=%2Fsms-opt-in">Sign in to Cloud QC</a>,
+          then come back to this page. Your number has to be attached to your
+          account, or we won&rsquo;t know whose updates to send you.
         </div>
       )}
 
@@ -162,9 +162,13 @@ export function SmsOptInForm({
       <button
         type="submit"
         className="optin-submit"
-        disabled={pending || !consent}
+        disabled={pending || !consent || !willLink}
       >
-        {pending ? "Signing you up…" : "Yes, sign me up!"}
+        {!willLink
+          ? "Sign in to continue"
+          : pending
+            ? "Signing you up…"
+            : "Yes, sign me up!"}
       </button>
     </form>
   );
